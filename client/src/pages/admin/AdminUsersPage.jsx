@@ -598,24 +598,26 @@ export default function AdminUsersPage({ role }) {
         onClose={() => setCreatedCreds(null)}
       />
 
-      <ConfirmDialog
-        open={statusTarget !== null}
-        title={
-          statusTarget?.action === 'deactivate'
-            ? 'Deactivate User Account?'
-            : 'Activate User Account?'
-        }
-        message={
-          statusTarget?.action === 'deactivate'
-            ? `${statusTarget.user.name} will be prohibited from signing in, and any ongoing session will be terminated immediately.`
-            : `${statusTarget.user.name} will have their account restored and will be able to sign into the system again.`
-        }
-        confirmLabel={statusTarget?.action === 'deactivate' ? 'Deactivate Account' : 'Activate Account'}
-        tone={statusTarget?.action === 'deactivate' ? 'danger' : 'default'}
-        busy={statusBusy}
-        onConfirm={confirmStatusChange}
-        onCancel={() => setStatusTarget(null)}
-      />
+      {statusTarget && (
+        <ConfirmDialog
+          open={true}
+          title={
+            statusTarget.action === 'deactivate'
+              ? 'Deactivate User Account?'
+              : 'Activate User Account?'
+          }
+          message={
+            statusTarget.action === 'deactivate'
+              ? `${statusTarget.user?.name || 'This user'} will be prohibited from signing in, and any ongoing session will be terminated immediately.`
+              : `${statusTarget.user?.name || 'This user'} will have their account restored and will be able to sign into the system again.`
+          }
+          confirmLabel={statusTarget.action === 'deactivate' ? 'Deactivate Account' : 'Activate Account'}
+          tone={statusTarget.action === 'deactivate' ? 'danger' : 'default'}
+          busy={statusBusy}
+          onConfirm={confirmStatusChange}
+          onCancel={() => setStatusTarget(null)}
+        />
+      )}
     </div>
   );
 }

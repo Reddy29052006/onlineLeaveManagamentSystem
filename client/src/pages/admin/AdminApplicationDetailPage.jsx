@@ -38,6 +38,7 @@ export default function AdminApplicationDetailPage() {
   const [decisionMode, setDecisionMode] = useState(null);
   const [decisionBusy, setDecisionBusy] = useState(false);
   const [decisionError, setDecisionError] = useState(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -113,7 +114,6 @@ export default function AdminApplicationDetailPage() {
   }
 
   const isPending = application.status === 'Pending';
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   async function handleDownloadPdf() {
     setDownloadingPdf(true);

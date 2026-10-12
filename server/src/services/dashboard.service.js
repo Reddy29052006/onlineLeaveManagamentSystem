@@ -81,7 +81,13 @@ export async function getAdminDashboard() {
 
   return {
     today,
-    users: { students, teachers, total: students + teachers },
+    users: {
+      students,
+      teachers,
+      totalStudents: students,
+      totalTeachers: teachers,
+      total: students + teachers,
+    },
     applications,
     onLeave,
     recentApplications: recentApplications.map((doc) => doc.toJSON()),

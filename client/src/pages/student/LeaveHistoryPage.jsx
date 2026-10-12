@@ -43,6 +43,7 @@ export default function LeaveHistoryPage() {
   const [sortOrder, setSortOrder] = useState('desc');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [downloadingId, setDownloadingId] = useState(null);
   const location = useLocation();
   const isTeacherRoute = location.pathname.startsWith('/teacher');
   const base = isTeacherRoute ? '/teacher' : (user?.role === 'teacher' ? '/teacher' : '/student');

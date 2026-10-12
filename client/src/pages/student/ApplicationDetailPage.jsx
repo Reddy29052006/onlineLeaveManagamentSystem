@@ -50,6 +50,7 @@ function formatDate(value) {
 }
 
 export default function ApplicationDetailPage() {
+  const { user } = useAuth();
   const { id } = useParams();
   const location = useLocation();
   const isTeacherRoute = location.pathname.startsWith('/teacher');
