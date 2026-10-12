@@ -22,7 +22,7 @@ export const loginLimiter = isTest
   ? (req, res, next) => next()
   : createRateLimiter({
       windowMs: 15 * 60 * 1000,
-      max: 10,
+      max: process.env.NODE_ENV === 'production' ? 10 : 200,
       message: 'Too many login attempts. Please wait a few minutes and try again.',
     });
 
