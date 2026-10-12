@@ -3,11 +3,18 @@ import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowLeft,
+  Calendar,
   CalendarClock,
   CheckCircle2,
+  Clock,
+  Download,
+  FileCheck,
+  FilePlus,
+  FileText,
   Info,
   Loader2,
   Send,
+  Sparkles,
 } from 'lucide-react';
 import { calendarApi } from '../../services/calendarApi.js';
 import { leavesApi } from '../../services/leavesApi.js';
@@ -17,40 +24,47 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
-const inputClass =
-  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200';
-
-function Field({ id, label, required, error, children }) {
-  return (
-    <div>
-      <label htmlFor={id} className="mb-1 block text-sm font-medium text-slate-700">
-        {label}
-        {required && <span className="text-red-500"> *</span>}
-      </label>
-      {children}
-      {error && (
-        <span role="alert" className="mt-1 block text-xs text-red-600">
-          {error}
-        </span>
-      )}
-    </div>
-  );
+function formatDate(isoStr) {
+  if (!isoStr) return '—';
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(new Date(isoStr));
+  } catch {
+    return isoStr;
+  }
 }
+
+const LEAVE_TYPES = [
+  { id: 'Casual Leave', label: 'Casual Leave', hint: 'Short absence for routine or casual reasons' },
+  { id: 'Medical Leave', label: 'Medical / Sick', hint: 'Health, hospital, or doctor recommended rest' },
+  { id: 'Academic / Duty', label: 'Academic / On Duty', hint: 'Seminars, examinations, conferences, or official duty' },
+  { id: 'Personal Leave', label: 'Personal / Urgent', hint: 'Family affairs, domestic matters, or emergency' },
+];
+
+const PRESET_REASONS = [
+  'Medical appointment and physician recommended rest',
+  'Family function and urgent personal obligation',
+  'Attending academic workshop and research seminar',
+  'Urgent personal travel to native hometown',
+];
 
 function WarningList({ warnings }) {
   if (!warnings || warnings.length === 0) {
     return (
-      <p className="flex items-center gap-2 text-sm text-green-700">
-        <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-        No weekend or holiday conflicts for this range.
+      <p className="flex items-center gap-2 text-xs font-medium text-emerald-700">
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
+        No holiday or weekend overlaps detected for this date range.
       </p>
     );
   }
   return (
-    <ul className="space-y-1">
+    <ul className="space-y-1.5">
       {warnings.map((warning) => (
-        <li key={warning} className="flex items-start gap-2 text-sm text-amber-800">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <li key={warning} className="flex items-start gap-2 text-xs font-medium text-amber-800">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" aria-hidden="true" />
           <span>{warning}</span>
         </li>
       ))}
@@ -60,9 +74,11 @@ function WarningList({ warnings }) {
 
 export default function LeaveApplyPage() {
   const { user } = useAuth();
-  const base = `/${user?.role || ''}`;
+  const isStudent = user?.role === 'student';
+  const base = `/${user?.role || 'student'}`;
 
   const [step, setStep] = useState('form');
+  const [leaveType, setLeaveType] = useState('Casual Leave');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [purpose, setPurpose] = useState('');
@@ -99,7 +115,7 @@ export default function LeaveApplyPage() {
     if (!startDate || !endDate || endDate < startDate) return undefined;
 
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
-    debounceRef.current = window.setTimeout(() => loadRange(startDate, endDate), 400);
+    debounceRef.current = window.setTimeout(() => loadRange(startDate, endDate), 350);
     return () => {
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
     };
@@ -110,12 +126,12 @@ export default function LeaveApplyPage() {
     if (!startDate) next.startDate = 'Start date is required';
     if (!endDate) next.endDate = 'End date is required';
     if (startDate && endDate && endDate < startDate) {
-      next.endDate = 'End date cannot be before the start date';
+      next.endDate = 'End date cannot be earlier than start date';
     }
     if (!purpose.trim()) {
-      next.purpose = 'Purpose is required';
+      next.purpose = 'Purpose of leave is required';
     } else if (purpose.trim().length < 5) {
-      next.purpose = 'Please provide at least 5 characters';
+      next.purpose = 'Please provide at least 5 characters explaining your reason';
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -132,15 +148,17 @@ export default function LeaveApplyPage() {
     setBusy(true);
     setSubmitError('');
     try {
+      // Append leave type to purpose if not explicitly included
+      const fullPurpose = `[${leaveType}] ${purpose.trim()}`;
       const response = await leavesApi.submit({
         startDate,
         endDate,
-        purpose: purpose.trim(),
+        purpose: fullPurpose,
       });
       setResult(response.data);
       setStep('success');
     } catch (err) {
-      setSubmitError(err.message || 'Unable to submit the application.');
+      setSubmitError(err.message || 'Unable to submit the leave application.');
     } finally {
       setBusy(false);
     }
@@ -148,6 +166,7 @@ export default function LeaveApplyPage() {
 
   function resetAll() {
     setStep('form');
+    setLeaveType('Casual Leave');
     setStartDate('');
     setEndDate('');
     setPurpose('');
@@ -158,249 +177,471 @@ export default function LeaveApplyPage() {
     setResult(null);
   }
 
+  // SUCCESS STEP VIEW
   if (step === 'success' && result) {
     return (
-      <div className="mx-auto max-w-2xl space-y-5">
-        <div className="rounded-2xl border border-green-200 bg-green-50 p-6 text-center">
-          <CheckCircle2 className="mx-auto h-10 w-10 text-green-600" aria-hidden="true" />
-          <h1 className="mt-3 text-lg font-semibold text-green-900">
-            Application submitted
+      <div className="mx-auto max-w-2xl space-y-6 animate-fade-in">
+        <div className="relative overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50/80 to-white p-8 text-center shadow-xs">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 shadow-2xs mb-4">
+            <CheckCircle2 className="h-8 w-8" aria-hidden="true" />
+          </div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-emerald-950">
+            Application Submitted Successfully!
           </h1>
-          <p className="mt-1 text-sm text-green-800">
-            Your leave request was saved and is pending review.
+          <p className="mt-1.5 text-xs sm:text-sm text-emerald-800">
+            Your official leave application has been registered into the institutional records and is queued for review.
           </p>
-          <p className="mt-4 text-xs uppercase tracking-wide text-green-700">
-            Application ID
-          </p>
-          <p className="text-2xl font-bold tracking-wide text-green-900">
-            {result.application.applicationId}
-          </p>
+
+          <div className="mt-5 inline-flex flex-col items-center rounded-xl border border-emerald-200/80 bg-white px-6 py-3 shadow-2xs">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700">
+              Official Application ID
+            </span>
+            <span className="mt-0.5 font-mono text-2xl font-extrabold text-[#182848]">
+              {result.application.applicationId}
+            </span>
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-slate-500">From</dt>
-              <dd className="font-medium">{result.application.startDate}</dd>
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-2xs space-y-4">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Application Summary
+          </h2>
+          <dl className="grid grid-cols-2 gap-4 text-xs sm:text-sm sm:grid-cols-4">
+            <div className="rounded-xl bg-slate-50 p-3">
+              <dt className="text-[11px] font-medium text-slate-400 uppercase">From Date</dt>
+              <dd className="mt-0.5 font-semibold text-slate-800">{formatDate(result.application.startDate)}</dd>
             </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-slate-500">To</dt>
-              <dd className="font-medium">{result.application.endDate}</dd>
+            <div className="rounded-xl bg-slate-50 p-3">
+              <dt className="text-[11px] font-medium text-slate-400 uppercase">To Date</dt>
+              <dd className="mt-0.5 font-semibold text-slate-800">{formatDate(result.application.endDate)}</dd>
             </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-slate-500">Calendar days</dt>
-              <dd className="font-medium">{result.range.calendarDays}</dd>
+            <div className="rounded-xl bg-slate-50 p-3">
+              <dt className="text-[11px] font-medium text-slate-400 uppercase">Calendar Days</dt>
+              <dd className="mt-0.5 font-semibold text-slate-800">{result.range.calendarDays}</dd>
             </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-slate-500">Leave days</dt>
-              <dd className="font-medium">{result.range.policyDays}</dd>
+            <div className="rounded-xl bg-slate-50 p-3">
+              <dt className="text-[11px] font-medium text-slate-400 uppercase">Leave Days</dt>
+              <dd className="mt-0.5 font-semibold text-emerald-700">{result.range.policyDays}</dd>
             </div>
           </dl>
+
           {result.warnings?.length > 0 && (
-            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5">
               <WarningList warnings={result.warnings} />
             </div>
           )}
         </div>
 
-        <div className="no-print flex flex-wrap gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
           <Link
             to={`${base}/applications/${result.application._id}`}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs hover:bg-blue-700 transition-colors"
           >
-            View application &amp; letter
+            <FileText className="h-4 w-4" />
+            View Application &amp; Formal Letter
           </Link>
-          <button
-            type="button"
-            onClick={resetAll}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-          >
-            Submit another
-          </button>
-          <Link
-            to={base}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-          >
-            Go to Dashboard
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={resetAll}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
+            >
+              Apply Another
+            </button>
+            <Link
+              to={base}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
+            >
+              Back to Dashboard
+            </Link>
+          </div>
         </div>
       </div>
     );
   }
 
+  // REVIEW STEP VIEW
   if (step === 'review') {
     return (
-      <div className="mx-auto max-w-2xl space-y-5">
+      <div className="mx-auto max-w-3xl space-y-6 animate-fade-in">
         <button
           type="button"
           onClick={() => setStep('form')}
           disabled={busy}
-          className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 disabled:opacity-50"
+          className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 disabled:opacity-50 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          Edit details
+          Edit Application Details
         </button>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h1 className="text-lg font-semibold text-slate-900">Review your request</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Confirm the details below. The formal letter is generated when you submit.
-          </p>
-
-          <dl className="mt-4 space-y-3 text-sm">
-            <div className="flex justify-between gap-4 border-b border-slate-100 pb-3">
-              <dt className="text-slate-500">Start date</dt>
-              <dd className="font-medium">{startDate}</dd>
-            </div>
-            <div className="flex justify-between gap-4 border-b border-slate-100 pb-3">
-              <dt className="text-slate-500">End date</dt>
-              <dd className="font-medium">{endDate}</dd>
-            </div>
-            <div className="flex justify-between gap-4 border-b border-slate-100 pb-3">
-              <dt className="text-slate-500">Requested leave days</dt>
-              <dd className="font-medium">
-                {range ? range.policyDays : '—'}
-              </dd>
-            </div>
+        <section className="rounded-2xl border border-slate-200/90 bg-white p-6 sm:p-7 shadow-2xs space-y-5">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div>
-              <dt className="text-slate-500">Purpose</dt>
-              <dd className="mt-1 whitespace-pre-wrap font-medium">{purpose.trim()}</dd>
+              <h1 className="text-lg sm:text-xl font-bold text-slate-900">
+                Review Your Leave Application
+              </h1>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Please verify all details before submitting. Your formal letter will be stamped and sent for approval.
+              </p>
+            </div>
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+              {leaveType}
+            </span>
+          </div>
+
+          <dl className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs sm:text-sm">
+            <div className="rounded-xl bg-slate-50 p-3.5">
+              <dt className="text-slate-400 font-medium uppercase text-[11px]">Start Date</dt>
+              <dd className="mt-1 font-semibold text-slate-800">{formatDate(startDate)}</dd>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-3.5">
+              <dt className="text-slate-400 font-medium uppercase text-[11px]">End Date</dt>
+              <dd className="mt-1 font-semibold text-slate-800">{formatDate(endDate)}</dd>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-3.5">
+              <dt className="text-slate-400 font-medium uppercase text-[11px]">Total Leave Days</dt>
+              <dd className="mt-1 font-semibold text-emerald-700">
+                {range ? `${range.policyDays} Day${range.policyDays === 1 ? '' : 's'}` : '—'}
+              </dd>
             </div>
           </dl>
 
-          <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <p className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
-              <Info className="h-4 w-4" aria-hidden="true" />
-              Calendar warnings
+          <div className="rounded-xl bg-slate-50 p-4 space-y-1">
+            <dt className="text-[11px] font-semibold text-slate-400 uppercase">Reason &amp; Purpose</dt>
+            <dd className="text-xs sm:text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
+              {purpose.trim()}
+            </dd>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+            <p className="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-700">
+              <Info className="h-4 w-4 text-blue-600" aria-hidden="true" />
+              Calendar Validation &amp; Academic Schedule
             </p>
             <WarningList warnings={range?.warnings} />
           </div>
         </section>
 
         {submitError && (
-          <p
+          <div
             role="alert"
-            className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+            className="flex items-center gap-2.5 rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs sm:text-sm font-medium text-rose-700 shadow-2xs"
           >
-            <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-            {submitError}
-          </p>
+            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>{submitError}</span>
+          </div>
         )}
 
-        <div className="no-print flex justify-end gap-3">
+        <div className="flex items-center justify-end gap-3 pt-2">
           <button
             type="button"
             onClick={() => setStep('form')}
             disabled={busy}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors shadow-2xs disabled:opacity-50"
           >
-            Cancel
+            Back to Edit
           </button>
           <button
             type="button"
             onClick={submit}
             disabled={busy}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
             ) : (
               <Send className="h-4 w-4" aria-hidden="true" />
             )}
-            {busy ? 'Submitting…' : 'Submit application'}
+            {busy ? 'Submitting Application…' : 'Confirm & Submit Application'}
           </button>
         </div>
       </div>
     );
   }
 
+  // STEP: 'form' - 2-Column Responsive Layout
+  const charCount = purpose.length;
+
   return (
-    <form onSubmit={goToReview} className="mx-auto max-w-2xl space-y-5" noValidate>
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900">Apply for leave</h1>
-        <p className="text-sm text-slate-500">
-          Choose your dates and describe the reason for your leave.
-        </p>
-      </div>
-
-      <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field id="startDate" label="Start date" required error={errors.startDate}>
-            <input
-              id="startDate"
-              type="date"
-              value={startDate}
-              max={endDate || undefined}
-              onChange={(e) => setStartDate(e.target.value)}
-              className={inputClass}
-            />
-          </Field>
-          <Field id="endDate" label="End date" required error={errors.endDate}>
-            <input
-              id="endDate"
-              type="date"
-              value={endDate}
-              min={startDate || undefined}
-              onChange={(e) => setEndDate(e.target.value)}
-              className={inputClass}
-            />
-          </Field>
-        </div>
-
-        <Field id="purpose" label="Purpose" required error={errors.purpose}>
-          <textarea
-            id="purpose"
-            rows={4}
-            value={purpose}
-            onChange={(e) => setPurpose(e.target.value)}
-            placeholder="Briefly describe the reason for your leave"
-            className={inputClass}
-          />
-        </Field>
-
-        <p className="text-xs text-slate-400">Today is {todayIso()}.</p>
-      </section>
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
-          <CalendarClock className="h-4 w-4" aria-hidden="true" />
-          Calendar check
-        </p>
-
-        {!startDate || !endDate || endDate < startDate ? (
-          <p className="text-sm text-slate-500">
-            Select a valid date range to see weekend and holiday warnings.
-          </p>
-        ) : rangeLoading ? (
-          <p className="flex items-center gap-2 text-sm text-slate-500">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            Checking your dates…
-          </p>
-        ) : rangeError ? (
-          <p className="flex items-center gap-2 text-sm text-red-600">
-            <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-            {rangeError}
-          </p>
-        ) : range ? (
-          <div className="space-y-3">
-            <p className="text-sm text-slate-600">
-              Requested leave days:{' '}
-              <span className="font-semibold text-slate-800">{range.policyDays}</span>{' '}
-              ({range.calendarDays} calendar day{range.calendarDays === 1 ? '' : 's'})
+    <div className="space-y-6">
+      {/* 1. Hero Banner */}
+      <section className="relative overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50/90 via-sky-50/70 to-indigo-50/80 p-5 sm:p-6 shadow-2xs">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="max-w-xl space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-100/80 px-3 py-0.5 text-xs font-semibold text-blue-800">
+              <FilePlus className="h-3.5 w-3.5" /> Leave Application Portal
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#182848]">
+              Apply for Leave
+            </h1>
+            <p className="text-xs sm:text-sm font-medium text-slate-600">
+              Fill in your leave dates, choose the category, state your reason, and preview your formal application letter before submission.
             </p>
-            <WarningList warnings={range.warnings} />
           </div>
-        ) : null}
+
+          <div className="flex shrink-0 items-center">
+            <span className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200/70 bg-white/90 px-3.5 py-1.5 text-xs font-medium text-slate-700 shadow-2xs">
+              <Calendar className="h-3.5 w-3.5 text-blue-600" />
+              Today: {formatDate(todayIso())}
+            </span>
+          </div>
+        </div>
       </section>
 
-      <div className="no-print flex justify-end">
-        <button
-          type="submit"
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-        >
-          Review request
-        </button>
+      {/* 2. Main 2-Column Grid */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        {/* Left Column: Form Controls (7 cols) */}
+        <form onSubmit={goToReview} className="space-y-5 lg:col-span-7" noValidate>
+          {/* Card 1: Leave Category Selection */}
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-2xs space-y-3">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+              1. Select Leave Category
+            </label>
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+              {LEAVE_TYPES.map((t) => {
+                const isSelected = leaveType === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setLeaveType(t.id)}
+                    className={`flex flex-col items-center justify-center rounded-xl p-3 text-center transition-all ${
+                      isSelected
+                        ? 'border-2 border-blue-600 bg-blue-50/80 text-blue-900 shadow-2xs'
+                        : 'border border-slate-200 bg-slate-50/50 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
+                    }`}
+                  >
+                    <span className="text-xs font-bold">{t.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-slate-500 font-medium">
+              Category hint:{' '}
+              <span className="text-blue-700 font-semibold">
+                {LEAVE_TYPES.find((t) => t.id === leaveType)?.hint}
+              </span>
+            </p>
+          </div>
+
+          {/* Card 2: Date Picker Range */}
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-2xs space-y-4">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+              2. Choose Leave Period
+            </label>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="startDate" className="mb-1 block text-xs font-semibold text-slate-700">
+                  Start Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="startDate"
+                  type="date"
+                  value={startDate}
+                  max={endDate || undefined}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm text-slate-800 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+                {errors.startDate && (
+                  <span className="mt-1 block text-[11px] font-medium text-rose-600">
+                    {errors.startDate}
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="endDate" className="mb-1 block text-xs font-semibold text-slate-700">
+                  End Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="endDate"
+                  type="date"
+                  value={endDate}
+                  min={startDate || undefined}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm text-slate-800 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+                {errors.endDate && (
+                  <span className="mt-1 block text-[11px] font-medium text-rose-600">
+                    {errors.endDate}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Calendar Check Status Card */}
+            {startDate && endDate && endDate >= startDate ? (
+              <div className="rounded-xl border border-slate-200/80 bg-slate-50 p-3.5 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                    <CalendarClock className="h-4 w-4 text-blue-600" />
+                    Calculated Leave Days:
+                  </span>
+                  {rangeLoading ? (
+                    <span className="flex items-center gap-1 text-slate-500">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking dates…
+                    </span>
+                  ) : range ? (
+                    <span className="font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                      {range.policyDays} policy day{range.policyDays === 1 ? '' : 's'} ({range.calendarDays} calendar)
+                    </span>
+                  ) : null}
+                </div>
+
+                {range && <WarningList warnings={range.warnings} />}
+                {rangeError && (
+                  <p className="text-xs text-rose-600 font-medium">{rangeError}</p>
+                )}
+              </div>
+            ) : null}
+          </div>
+
+          {/* Card 3: Purpose / Reason Textarea */}
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between">
+              <label htmlFor="purpose" className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+                3. Purpose of Leave <span className="text-red-500">*</span>
+              </label>
+              <span className="text-[11px] text-slate-400 font-mono">
+                {charCount} characters
+              </span>
+            </div>
+
+            <textarea
+              id="purpose"
+              rows={4}
+              value={purpose}
+              onChange={(e) => setPurpose(e.target.value)}
+              placeholder="State the clear reason for your leave request (e.g. medical illness, family emergency, academic conference)…"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-xs sm:text-sm text-slate-800 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+            {errors.purpose && (
+              <span className="block text-[11px] font-medium text-rose-600">
+                {errors.purpose}
+              </span>
+            )}
+
+            {/* Quick Suggestion Chips */}
+            <div className="space-y-1.5 pt-1">
+              <p className="text-[11px] font-semibold text-slate-500">
+                Quick Reason Suggestions:
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {PRESET_REASONS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setPurpose(preset)}
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors"
+                  >
+                    + {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Submit Action Button */}
+          <div className="flex justify-end pt-1">
+            <button
+              type="submit"
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-xs sm:text-sm font-semibold text-white shadow-xs hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 transition-colors"
+            >
+              <FileCheck className="h-4 w-4" />
+              Review &amp; Submit Request
+            </button>
+          </div>
+        </form>
+
+        {/* Right Column: Live Formal Letter Preview (5 cols) */}
+        <aside className="lg:col-span-5">
+          <div className="sticky top-6 rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
+            {/* Sheet Header Banner */}
+            <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-blue-600" />
+                <span className="text-xs font-bold text-slate-800">
+                  Live Formal Letter Preview
+                </span>
+              </div>
+              <span className="rounded-full bg-blue-100/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-800">
+                Draft Watermark
+              </span>
+            </div>
+
+            {/* Sheet Body (Simulated Formal Document) */}
+            <div className="relative p-6 sm:p-7 font-serif text-slate-800 text-xs sm:text-sm leading-relaxed space-y-4 bg-white min-h-[460px]">
+              {/* Institution Header */}
+              <div className="text-center border-b border-slate-200 pb-3 space-y-0.5 font-sans">
+                <h3 className="text-xs sm:text-sm font-extrabold tracking-wider text-slate-900 uppercase">
+                  Online Leave Management System
+                </h3>
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Academic Institution &bull; Official Student &amp; Faculty Services
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  Date: {formatDate(todayIso())}
+                </p>
+              </div>
+
+              {/* Addressee */}
+              <div className="space-y-0.5 font-sans text-xs text-slate-700">
+                <p className="font-semibold text-slate-900">To,</p>
+                <p>The Principal / Head of Department,</p>
+                <p>{user?.department || 'Academic Department'},</p>
+                <p>Main Campus.</p>
+              </div>
+
+              {/* Subject */}
+              <div className="font-sans font-bold text-xs text-slate-900 bg-slate-50 p-2 rounded border border-slate-100">
+                Subject: Application for {leaveType} ({startDate || 'YYYY-MM-DD'} to {endDate || 'YYYY-MM-DD'})
+              </div>
+
+              {/* Salutation */}
+              <p className="font-sans text-xs">Respected Sir / Madam,</p>
+
+              {/* Letter Content Preview */}
+              <div className="font-sans text-xs text-slate-700 space-y-2 leading-normal">
+                <p>
+                  I, <strong className="text-slate-900">{user?.name || 'Applicant Name'}</strong>,{' '}
+                  {isStudent ? (
+                    <>a student of <strong>{user?.course || 'the college'}</strong> (ID: <span className="font-mono">{user?.studentId || '—'}</span>)</>
+                  ) : (
+                    <>faculty member in <strong>{user?.department || 'Department'}</strong> (ID: <span className="font-mono">{user?.teacherId || '—'}</span>)</>
+                  )}, respectfully request permission for leave of absence from{' '}
+                  <span className="font-semibold text-slate-900">{formatDate(startDate) || '[Start Date]'}</span> to{' '}
+                  <span className="font-semibold text-slate-900">{formatDate(endDate) || '[End Date]'}</span>.
+                </p>
+
+                <p className="italic text-slate-800 bg-blue-50/50 p-2.5 rounded border border-blue-100/60">
+                  &ldquo;{purpose.trim() || 'Purpose and explanation for leave will appear here as you type…'}&rdquo;
+                </p>
+
+                <p>
+                  I shall ensure all pending coursework, responsibilities, or lecture assignments are duly managed during my absence. Kindly consider and approve my application.
+                </p>
+              </div>
+
+              {/* Sign-off */}
+              <div className="pt-4 font-sans text-xs text-slate-800 space-y-0.5 border-t border-slate-100">
+                <p>Yours faithfully,</p>
+                <p className="font-bold text-slate-900">{user?.name || 'Applicant Name'}</p>
+                <p className="text-[11px] text-slate-500">
+                  {user?.department} &bull; {user?.email}
+                </p>
+              </div>
+
+              {/* Draft Watermark Badge */}
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-[0.03]">
+                <span className="text-6xl font-black uppercase tracking-widest text-slate-900 rotate-[-25deg]">
+                  LEAVEHUB DRAFT
+                </span>
+              </div>
+            </div>
+          </div>
+        </aside>
       </div>
-    </form>
+    </div>
   );
 }
