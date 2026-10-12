@@ -56,8 +56,8 @@ Because there is no existing code, every required feature is **MISSING**:
 | Notifications + Dashboards + WebSockets (Stage 7) | COMPLETED |
 | Academic Calendar + Holiday Management (Stage 8) | COMPLETED |
 | Leave History + Print + PDF Downloads (Stage 9) | COMPLETED |
-| UI/UX, Accessibility & Responsiveness (Stage 10) | NEXT |
-| Security/reliability hardening (Stage 11) | PENDING |
+| UI/UX, Accessibility & Responsiveness (Stage 10) | COMPLETED |
+| Security/reliability hardening (Stage 11) | NEXT |
 | Automated + E2E tests (Stage 12) | PENDING |
 | Deployment docs + README (Stage 13) | PENDING |
 
@@ -1135,5 +1135,95 @@ COMPLETED AND VERIFIED.
 ### 7. Next stage
 
 **Stage 10 — UI/UX, Accessibility, and Responsive Behavior.**
+
+---
+
+## Stage 10 — UI/UX, Accessibility, and Responsive Behavior
+
+**Status:** COMPLETED AND VERIFIED
+**Date:** 2026-10-12
+
+### 1. Goal
+
+Make all three role interfaces consistent, clear, accessible, and usable across desktop, tablet, and mobile devices, including institution settings administration and off-canvas mobile navigation drawers.
+
+### 2. Delivered Features
+
+- **Institution & System Settings API (`settings.routes.js`, `settings.controller.js`, `settings.service.js`):**
+  - Mounted under `/api/v1/settings`.
+  - `GET /api/v1/settings`: Authenticated access for all roles to view institution name, timezone, application prefix, contact details, and locked system leave policies.
+  - `PATCH /api/v1/settings`: Restricted to administrators (`authorizeRole('admin')`). Validates institution name, timezone, application prefix, email pattern, and academic year start/end date order. Writes audit log `settings_updated`.
+  
+- **Admin Settings Console (`AdminSettingsPage.jsx`):**
+  - Mounted at `/admin/settings` with navigation link and dashboard quick-action card.
+  - LeaveHub Hero Banner with Administrative Governance badge.
+  - 4 Pastel KPI cards: System Timezone, Application ID Prefix, Academic Year, and Leave Policy Status.
+  - Section 1: Campus Identity & Contact Information (Institution Name, Contact Email, Contact Phone, Campus Location/Address).
+  - Section 2: System Parameters & Academic Year (Authoritative Timezone dropdown, ID Prefix input, Academic Year Start and End datepickers with cross-field validation).
+  - Section 3: Locked Institution Leave Policy Cards displaying confirmed immutable policies (Weekends Counted: YES, Holidays Counted: YES, Rejection Reason: MANDATORY, Decision Lock: ATOMIC).
+  - Full loading skeletons, inline field errors, and dismissable success messages.
+
+- **Responsive Mobile Navigation Drawers:**
+  - Upgraded `AdminLayout.jsx` and `ApplicantLayout.jsx`:
+    - Mobile header hamburger button (`Menu` icon) visible on `< lg` screens with accessible `aria-label`.
+    - Off-canvas slide-out navigation drawer with dark navy background (`#132238`), LeaveHub branding, and smooth slide animation.
+    - Backdrop overlay (`bg-slate-900/60 backdrop-blur-xs`) with click-to-close behavior.
+    - Keyboard accessibility: closes on `Escape` key press; `role="dialog"` and `aria-modal="true"`.
+    - Auto-closes automatically whenever a navigation route change occurs.
+
+- **Accessibility & Focus State Polish:**
+  - Added visible keyboard focus rings (`focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:outline-none`) across all navigation items, buttons, and inputs.
+  - Preserved semantic labels, required indicators (`*`), and ARIA attributes across all dialogs and forms.
+  - Horizontal scroll wrappers (`overflow-x-auto`) ensured on all tabular interfaces for responsive mobile layouts.
+
+### 3. Files created (Stage 10)
+
+Server:
+- `server/src/services/settings.service.js`
+- `server/src/controllers/settings.controller.js`
+- `server/src/routes/settings.routes.js`
+
+Client:
+- `client/src/services/settingsApi.js`
+- `client/src/pages/admin/AdminSettingsPage.jsx`
+
+Tests:
+- `scratch/test_stage10.js`
+
+### 4. Files modified (Stage 10)
+
+Server:
+- `server/src/routes/index.js` — Mounted `/settings` route.
+
+Client:
+- `client/src/layouts/AdminLayout.jsx` — Added responsive mobile drawer, Institution Settings nav item, and accessible focus rings.
+- `client/src/layouts/ApplicantLayout.jsx` — Added responsive mobile drawer, hamburger button, and accessible focus rings.
+- `client/src/pages/admin/AdminHome.jsx` — Added Institution Settings quick-action card and updated grid.
+- `client/src/routes/AppRouter.jsx` — Mounted `/admin/settings` route.
+- `PROJECT_PROGRESS.md` — Updated stage status and documentation.
+
+### 5. Testing and verification
+
+- **PASS** — Client build (`npm run build`): 1634 modules built cleanly in 1.98s.
+- **PASS** — Backend syntax: `node --check` passed on all server files.
+- **PASS** — Automated Test Suite (`scratch/test_stage10.js`):
+  - Service health & DB connection: 200 OK.
+  - Unauthenticated access to `/api/v1/settings`: blocked with 401 Unauthorized.
+  - Student login & CSRF token extraction: 200 OK.
+  - Student read `/api/v1/settings`: 200 OK with full settings payload.
+  - Student attempt `PATCH /api/v1/settings`: rejected with 403 Forbidden (RBAC confirmed).
+  - Admin login: 200 OK.
+  - Empty institution name validation: 400 Bad Request.
+  - Inverted academic year date order validation: 400 Bad Request.
+  - Admin update institution settings: 200 OK with persisted changes in MongoDB Atlas.
+  - Original institution name cleanly restored: 200 OK.
+
+### 6. Stage completion status
+
+COMPLETED AND VERIFIED.
+
+### 7. Next stage
+
+**Stage 11 — Security, Validation, Reliability, and Error Handling.**
 
 

@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
+  Building,
   Calendar,
   CheckCircle2,
   Clock,
@@ -60,6 +60,13 @@ const QUICK_ACTIONS = [
     description: 'Configure faculty accounts, designations, and departmental permissions.',
     icon: Users,
     color: 'purple',
+  },
+  {
+    to: '/admin/settings',
+    title: 'Institution Settings',
+    description: 'Manage academic calendar bounds, timezone, contact info, and policies.',
+    icon: Building,
+    color: 'indigo',
   },
 ];
 
@@ -422,13 +429,14 @@ export default function AdminHome() {
       {/* 4. Pastel Quick Action Cards */}
       <section>
         <h2 className="text-base font-bold text-slate-900 mb-3">Administrative Hub Actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {QUICK_ACTIONS.map(({ to, title, description, icon: Icon, color }) => {
             const colorClasses = {
               blue: 'bg-blue-50/60 border-blue-100 hover:border-blue-300 group-hover:bg-blue-100/60',
               emerald: 'bg-emerald-50/60 border-emerald-100 hover:border-emerald-300 group-hover:bg-emerald-100/60',
               amber: 'bg-amber-50/60 border-amber-100 hover:border-amber-300 group-hover:bg-amber-100/60',
               purple: 'bg-purple-50/60 border-purple-100 hover:border-purple-300 group-hover:bg-purple-100/60',
+              indigo: 'bg-indigo-50/60 border-indigo-100 hover:border-indigo-300 group-hover:bg-indigo-100/60',
             }[color] || 'bg-slate-50 border-slate-100';
 
             const iconBg = {
@@ -436,6 +444,7 @@ export default function AdminHome() {
               emerald: 'bg-emerald-600 text-white',
               amber: 'bg-amber-600 text-white',
               purple: 'bg-purple-600 text-white',
+              indigo: 'bg-indigo-600 text-white',
             }[color] || 'bg-slate-700 text-white';
 
             return (

@@ -10,6 +10,7 @@ import AdminUserDetailPage from '../pages/admin/AdminUserDetailPage.jsx';
 import AdminApplicationsPage from '../pages/admin/AdminApplicationsPage.jsx';
 import AdminApplicationDetailPage from '../pages/admin/AdminApplicationDetailPage.jsx';
 import AdminCalendarPage from '../pages/admin/AdminCalendarPage.jsx';
+import AdminSettingsPage from '../pages/admin/AdminSettingsPage.jsx';
 import ApplicantLayout from '../layouts/ApplicantLayout.jsx';
 import LeaveApplyPage from '../pages/student/LeaveApplyPage.jsx';
 import LeaveHistoryPage from '../pages/student/LeaveHistoryPage.jsx';
@@ -67,6 +68,7 @@ export default function AppRouter() {
           path="teachers/:id"
           element={<AdminUserDetailPage role="teacher" />}
         />
+        <Route path="settings" element={<AdminSettingsPage />} />
       </Route>
 
       <Route

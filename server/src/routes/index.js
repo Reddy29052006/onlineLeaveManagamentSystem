@@ -6,6 +6,7 @@ import leavesRoutes from './leaves.routes.js';
 import calendarRoutes from './calendar.routes.js';
 import notificationsRoutes from './notifications.routes.js';
 import dashboardRoutes from './dashboard.routes.js';
+import settingsRoutes from './settings.routes.js';
 
 const router = Router();
 
@@ -16,5 +17,6 @@ router.use('/leaves', leavesRoutes);
 router.use('/calendar', calendarRoutes);
 router.use('/notifications', notificationsRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/settings', settingsRoutes);
 
 export default router;
