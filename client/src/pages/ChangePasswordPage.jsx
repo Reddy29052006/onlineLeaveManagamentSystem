@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
-  AtSign,
   BadgeCheck,
   Check,
   Clock,
@@ -52,16 +51,6 @@ function getInitials(name = '') {
   if (parts.length === 0) return 'U';
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-function formatDate(value) {
-  if (!value) return 'Never';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Never';
-  return date.toLocaleString(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
 }
 
 function PasswordField({
@@ -274,47 +263,8 @@ export default function ChangePasswordPage() {
                 <div className="mt-4 divide-y divide-slate-100 border-t border-slate-100">
                   <InfoRow icon={UserIcon} label="Username" value={user?.username} />
                   <InfoRow icon={Mail} label="Email address" value={user?.email} />
-                  <InfoRow
-                    icon={AtSign}
-                    label="Account status"
-                    value={
-                      user?.accountStatus
-                        ? user.accountStatus.charAt(0).toUpperCase() +
-                          user.accountStatus.slice(1)
-                        : 'Active'
-                    }
-                  />
-                  <InfoRow
-                    icon={Clock}
-                    label="Last sign-in"
-                    value={formatDate(user?.lastLoginAt)}
-                  />
                 </div>
               </div>
-            </section>
-
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="mb-4 flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-emerald-500" aria-hidden="true" />
-                <h3 className="text-sm font-semibold text-slate-900">
-                  Security practices
-                </h3>
-              </div>
-              <ul className="space-y-3 text-sm text-slate-600">
-                {[
-                  'Your password is hashed with bcrypt and never stored in plain text.',
-                  'Sessions use secure, HTTP-only cookies with CSRF protection.',
-                  'Sign-in attempts are rate limited against brute-force attacks.',
-                  'Use a unique password you do not reuse on other websites.',
-                ].map((tip) => (
-                  <li key={tip} className="flex items-start gap-2.5">
-                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                      <Check className="h-3 w-3" aria-hidden="true" />
-                    </span>
-                    <span>{tip}</span>
-                  </li>
-                ))}
-              </ul>
             </section>
           </div>
 
