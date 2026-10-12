@@ -4,6 +4,21 @@ function joinParts(parts, separator = ', ') {
   return parts.filter((part) => part && String(part).trim()).join(separator);
 }
 
+/** Format an instant as a readable date/time for the letter decision footer. */
+function formatInstantForLetter(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
 /**
  * Human-readable description of the applicant for the letter body, using a
  * role-specific phrase so no raw placeholder is ever shown.
@@ -38,7 +53,6 @@ function applicantIdFor(user) {
  */
 export function buildLetterContent({
   user,
-  applicationId,
   startDate,
   endDate,
   purpose,
@@ -69,10 +83,36 @@ export function buildLetterContent({
     user.name,
     applicantId,
     applicationDate,
-    '',
-    `Application ID: ${applicationId}`,
-    'Status: Pending',
   ].join('\n');
+}
+
+/**
+ * Append a footer describing the *current* application status so a letter
+ * never goes stale: Pending letters show "Pending", and decided letters also
+ * show the decision date plus rejection reason / note. Any previously stored
+ * footer is stripped first so legacy letters are upgraded on read.
+ */
+export function composeLetterContent(application) {
+  const a = application.toObject ? application.toObject() : application;
+  const base = String(a.letterContent || '')
+    .replace(/\n*Application ID:[\s\S]*$/, '')
+    .trimEnd();
+
+  const footer = ['', `Application ID: ${a.applicationId}`, `Status: ${a.status || 'Pending'}`];
+
+  if (a.status && a.status !== 'Pending') {
+    if (a.decisionAt) {
+      footer.push(`Decision Date: ${formatInstantForLetter(a.decisionAt)}`);
+    }
+    if (a.status === 'Rejected' && a.rejectionReason) {
+      footer.push(`Rejection Reason: ${a.rejectionReason}`);
+    }
+    if (a.decisionNote) {
+      footer.push(`Remark: ${a.decisionNote}`);
+    }
+  }
+
+  return `${base}\n${footer.join('\n')}`;
 }
 
 /**
@@ -81,7 +121,7 @@ export function buildLetterContent({
 export function buildLetterPayload(application) {
   const a = application.toObject ? application.toObject() : application;
   return {
-    content: a.letterContent,
+    content: composeLetterContent(a),
     subject: 'Request for Leave',
     applicationId: a.applicationId,
     status: a.status,

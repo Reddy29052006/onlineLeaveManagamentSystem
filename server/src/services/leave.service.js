@@ -160,7 +160,6 @@ export async function submitApplication({ user, data = {} }) {
 
     const letterContent = buildLetterContent({
       user,
-      applicationId,
       startDate,
       endDate,
       purpose,

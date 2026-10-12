@@ -10,12 +10,10 @@ import {
   HelpCircle,
   ListChecks,
   Loader2,
-  Sparkles,
   XCircle,
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../features/auth/AuthContext.jsx';
-import { ROLE_LABELS } from '../routes/roleHome.js';
 import { dashboardApi } from '../services/dashboardApi.js';
 import { wsClient } from '../services/websocket.js';
 import StatCard from '../components/StatCard.jsx';
@@ -38,12 +36,10 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const location = useLocation();
   const isTeacherRoute = location.pathname.startsWith('/teacher');
-  const isTeacher = isTeacherRoute || user?.role === 'teacher';
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [balanceTab, setBalanceTab] = useState(isTeacher ? 'employee' : 'student');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -100,11 +96,12 @@ export default function DashboardPage() {
   const base = isTeacherRoute ? '/teacher' : (user?.role === 'teacher' ? '/teacher' : '/student');
   const { today, stats = { total: 0, pending: 0, approved: 0, rejected: 0, pendingDays: 0, approvedDays: 0 }, recentApplications = [] } = data || {};
 
-  // Dynamic leave balances
-  const casualUsed = Math.min(stats.approved, 10);
-  const sickUsed = Math.min(stats.pending, 10);
-  const academicUsed = Math.min(stats.upcomingApproved || 0, 5);
-  const totalDaysUsed = Math.min(stats.approvedDays || 0, 30);
+  // Real, data-derived metrics (no hardcoded quotas).
+  const approvedDays = stats.approvedDays || 0;
+  const pendingDays = stats.pendingDays || 0;
+  const rejectedDays = stats.rejectedDays || 0;
+  const totalDaysUsed = approvedDays + pendingDays + rejectedDays;
+  const maxDays = Math.max(approvedDays, pendingDays, rejectedDays, 1);
 
   return (
     <div className="space-y-5">
@@ -281,107 +278,80 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Right Column: Leave Balance (5 Cols) */}
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-2xs lg:col-span-5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-              <h2 className="text-sm sm:text-base font-bold text-slate-900">Leave Balance</h2>
-              <Link
-                to={`${base}/calendar`}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-700"
-              >
-                View Details
-              </Link>
+        {/* Right Column: Leave Insights (5 Cols) */}
+        <div className="rounded-xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-2xs lg:col-span-5 flex flex-col">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <h2 className="text-sm sm:text-base font-bold text-slate-900">Leave Insights</h2>
+            <Link
+              to={`${base}/history`}
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+            >
+              View History
+            </Link>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="rounded-lg bg-slate-50 p-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                Approved Days
+              </p>
+              <p className="mt-0.5 text-lg font-extrabold text-emerald-700">{approvedDays}</p>
             </div>
-
-            {/* Role Category Tabs */}
-            <div className="mt-3 flex rounded-lg bg-slate-100 p-0.5">
-              <button
-                type="button"
-                onClick={() => setBalanceTab('employee')}
-                className={`flex-1 rounded-md py-1 text-xs font-semibold transition-all ${
-                  balanceTab === 'employee'
-                    ? 'bg-blue-600 text-white shadow-2xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Employee / Teacher
-              </button>
-              <button
-                type="button"
-                onClick={() => setBalanceTab('student')}
-                className={`flex-1 rounded-md py-1 text-xs font-semibold transition-all ${
-                  balanceTab === 'student'
-                    ? 'bg-blue-600 text-white shadow-2xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Student
-              </button>
-            </div>
-
-            {/* Leave Quota Progress Bars */}
-            <div className="mt-3.5 space-y-2.5">
-              {/* Casual Leave */}
-              <div>
-                <div className="flex items-center justify-between text-xs font-medium text-slate-700">
-                  <span>Casual Leave</span>
-                  <span className="font-semibold text-slate-900">{casualUsed} / 10</span>
-                </div>
-                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full bg-blue-600 transition-all duration-500"
-                    style={{ width: `${Math.min((casualUsed / 10) * 100, 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Sick Leave */}
-              <div>
-                <div className="flex items-center justify-between text-xs font-medium text-slate-700">
-                  <span>Medical / Sick Leave</span>
-                  <span className="font-semibold text-slate-900">{sickUsed} / 10</span>
-                </div>
-                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-                    style={{ width: `${Math.min((sickUsed / 10) * 100, 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Earned / Academic Leave */}
-              <div>
-                <div className="flex items-center justify-between text-xs font-medium text-slate-700">
-                  <span>{balanceTab === 'employee' ? 'Duty / Academic Leave' : 'Academic Leave'}</span>
-                  <span className="font-semibold text-slate-900">{academicUsed} / 5</span>
-                </div>
-                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full bg-amber-500 transition-all duration-500"
-                    style={{ width: `${Math.min((academicUsed / 5) * 100, 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Semester Total Allowance */}
-              <div>
-                <div className="flex items-center justify-between text-xs font-medium text-slate-700">
-                  <span>Semester Quota</span>
-                  <span className="font-semibold text-slate-900">{totalDaysUsed} / 30 Days</span>
-                </div>
-                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full bg-purple-600 transition-all duration-500"
-                    style={{ width: `${Math.min((totalDaysUsed / 30) * 100, 100)}%` }}
-                  />
-                </div>
-              </div>
+            <div className="rounded-lg bg-slate-50 p-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                Applied Days
+              </p>
+              <p className="mt-0.5 text-lg font-extrabold text-[#182848]">{totalDaysUsed}</p>
             </div>
           </div>
 
-          <div className="mt-3.5 rounded-lg bg-slate-50 p-2 text-center text-[11px] text-slate-500">
-            Allowances follow the institutional calendar &amp; approval policies.
+          {/* Day breakdown bars */}
+          <div className="mt-3.5 space-y-2.5">
+            {[
+              { label: 'Approved', days: approvedDays, bar: 'bg-emerald-500' },
+              { label: 'Pending', days: pendingDays, bar: 'bg-amber-500' },
+              { label: 'Rejected', days: rejectedDays, bar: 'bg-rose-500' },
+            ].map((row) => (
+              <div key={row.label}>
+                <div className="flex items-center justify-between text-xs font-medium text-slate-700">
+                  <span>{row.label}</span>
+                  <span className="font-semibold text-slate-900">
+                    {row.days} day{row.days === 1 ? '' : 's'}
+                  </span>
+                </div>
+                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className={`h-full rounded-full ${row.bar} transition-all duration-500`}
+                    style={{ width: `${Math.round((row.days / maxDays) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 text-center">
+            <div className="rounded-lg border border-slate-100 bg-slate-50 p-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                Upcoming
+              </p>
+              <p className="mt-0.5 text-sm font-bold text-purple-700">
+                {stats.upcomingApproved || 0}
+              </p>
+            </div>
+            <div className="rounded-lg border border-slate-100 bg-slate-50 p-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                On Leave Now
+              </p>
+              <p className="mt-0.5 text-sm font-bold text-blue-700">
+                {stats.currentOnLeave ? 'Yes' : 'No'}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-auto pt-3">
+            <div className="rounded-lg bg-slate-50 p-2 text-center text-[11px] text-slate-500">
+              Figures update live as your applications are reviewed.
+            </div>
           </div>
         </div>
       </section>

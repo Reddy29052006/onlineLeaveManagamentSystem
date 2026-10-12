@@ -176,12 +176,15 @@ npm run seed
 | PATCH  | `/api/v1/users/:id`            | Admin           | Update account                  |
 | PATCH  | `/api/v1/users/:id/status`     | Admin           | Activate/deactivate             |
 | GET    | `/api/v1/users/:id/leave-summary` | Admin or self | Leave totals                    |
+| GET    | `/api/v1/leaves/mine`          | Student/Teacher | Own applications (paginated)    |
+| GET    | `/api/v1/leaves/mine/summary`  | Student/Teacher | Own leave totals                |
 | POST   | `/api/v1/leaves`               | Student/Teacher | Submit leave application        |
 | GET    | `/api/v1/leaves`               | Admin           | List/filter applications        |
 | POST   | `/api/v1/leaves/:id/approve`   | Admin           | Approve a pending application   |
 | POST   | `/api/v1/leaves/:id/reject`    | Admin           | Reject a pending application    |
 | GET    | `/api/v1/leaves/:id`           | Owner or Admin  | Read an application             |
 | GET    | `/api/v1/leaves/:id/letter`    | Owner or Admin  | Generated letter data           |
+| GET    | `/api/v1/leaves/:id/pdf`       | Owner or Admin  | Download official PDF letter    |
 | POST   | `/api/v1/calendar/check-range` | Authenticated   | Range warnings + day counts     |
 | GET    | `/api/v1/calendar/events`      | Authenticated   | Calendar events list            |
 | GET    | `/api/v1/calendar/events/:id`  | Authenticated   | Calendar event details          |
@@ -195,14 +198,32 @@ npm run seed
 | GET    | `/api/v1/dashboard/mine`       | Student/Teacher | Applicant dashboard stats        |
 | GET    | `/api/v1/dashboard/admin`      | Admin           | Admin dashboard stats           |
 | WS     | `/ws` (or `/api/v1/ws`)        | Authenticated   | Real-time WebSocket notifications|
-
-Further endpoints are added in later stages (history/PDF, settings).
+| GET    | `/api/v1/settings`             | Authenticated   | Read institution settings       |
+| PATCH  | `/api/v1/settings`             | Admin           | Update institution settings     |
 
 ## Testing
 
+The backend uses the built-in Node.js test runner (`node:test`) with the
+`node:assert` library — no extra test dependencies.
+
 ```bash
-npm test            # backend tests (node:test)
+npm test                              # run the full backend suite
+npm --prefix server test              # equivalent, run from the repo root
+node --test server/test/dateOnly.test.js   # run a single file
 ```
+
+Test files live in `server/test/` and cover the pure, DB-independent logic:
+
+| File                          | Covers                                          |
+|-------------------------------|-------------------------------------------------|
+| `dateOnly.test.js`            | UTC calendar-date helpers (parsing, arithmetic) |
+| `pagination.test.js`          | Page/limit parsing and pagination metadata      |
+| `password.test.js`            | bcrypt hashing and verification                 |
+| `letter.service.test.js`      | Applicant phrasing and letter content/status    |
+
+Flows that require a MongoDB connection (auth, submissions, decisions) are
+verified end-to-end against a running database via the seed accounts; they are
+intentionally not part of the unit suite so tests run without external services.
 
 ## Build
 
@@ -231,8 +252,11 @@ npm run build       # production build of the frontend
 
 ## Known limitations
 
-- Stages 0–8 are implemented and verified: configuration, models, auth/RBAC, user
-  management, leave submission with generated letters, admin review/
-  approval/rejection, notifications, role-specific dashboards with live
-  statistics, shared academic calendar with admin CRUD, and real-time
-  WebSocket streaming for notifications and status updates. See `PROJECT_PROGRESS.md`.
+- Stages 0–13 are implemented: configuration, models, auth/RBAC, user
+  management, leave submission with generated letters, admin review/approval/
+  rejection, notifications, role-specific dashboards with live statistics,
+  shared academic calendar with admin CRUD, real-time WebSocket streaming,
+  institution settings, the security/settings UI, backend unit tests, and this
+  documentation. See `PROJECT_PROGRESS.md` for the stage log.
+- Automated tests currently cover pure backend logic only; database-backed
+  flows are verified manually against seeded accounts (see **Testing**).

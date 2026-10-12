@@ -58,8 +58,8 @@ Because there is no existing code, every required feature is **MISSING**:
 | Leave History + Print + PDF Downloads (Stage 9) | COMPLETED |
 | UI/UX, Accessibility & Responsiveness (Stage 10) | COMPLETED |
 | Security/reliability hardening (Stage 11) | COMPLETED |
-| Automated + E2E tests (Stage 12) | NEXT |
-| Deployment docs + README (Stage 13) | PENDING |
+| Automated + E2E tests (Stage 12) | COMPLETED |
+| Deployment docs + README (Stage 13) | COMPLETED |
 
 ### 4. Confirmed Technology Stack
 
@@ -1298,6 +1298,140 @@ COMPLETED AND VERIFIED.
 ### 7. Next stage
 
 **Stage 12 — Automated and End-to-End Testing.**
+
+---
+
+## Stage 12 — Automated and End-to-End Testing
+
+**Status:** COMPLETED AND VERIFIED
+**Date:** 2026-10-12
+
+### 1. Goal
+
+Add a fast, dependency-free automated test suite for the backend's pure logic
+so regressions are caught without needing a running database or external
+services, while keeping DB-backed flows verifiable against seeded accounts.
+
+### 2. Delivered Features
+
+- **Built-in Node.js test runner** (`node --test --test-reporter=spec`) using
+  `node:assert` — no new dependencies.
+- **27 unit tests** across four files under `server/test/`:
+  - `dateOnly.test.js` — date-only validation, add/compare, inclusive day
+    counts, enumeration, weekend detection, display formatting, timezone
+    "today".
+  - `pagination.test.js` — page/limit parsing, clamping, custom limits, and
+    pagination metadata.
+  - `password.test.js` — bcrypt hashing/verification, wrong-password rejection,
+    missing-input safety, per-hash salting.
+  - `letter.service.test.js` — applicant phrasing for students/teachers, formal
+    letter body, **current-status composition** (Pending/Approved/Rejected with
+    decision date/reason/remark), legacy-footer upgrade, and structured payload.
+
+### 3. Files created (Stage 12)
+
+- `server/test/dateOnly.test.js`
+- `server/test/pagination.test.js`
+- `server/test/password.test.js`
+- `server/test/letter.service.test.js`
+
+### 4. Files modified (Stage 12)
+
+- `README.md` — expanded **Testing** section (runner, commands, coverage table,
+  DB-flow note).
+- `PROJECT_PROGRESS.md` — this update.
+
+### 5. Testing and verification
+
+- **PASS** — `npm test` (root) / `npm --prefix server test`: **27 passed,
+  0 failed** in ~2s.
+
+### 6. Stage completion status
+
+COMPLETED AND VERIFIED.
+
+### 7. Next stage
+
+**Stage 13 — Deployment Docs, README, and Final Cleanup.**
+
+---
+
+## Stage 13 — Deployment Docs, README, and Final Cleanup
+
+**Status:** COMPLETED AND VERIFIED
+**Date:** 2026-10-12
+
+### 1. Goal
+
+Bring the documentation in line with the finished feature set, remove dead
+code, and fix correctness issues found during the final review pass.
+
+### 2. Delivered Features
+
+- **Letter status is now always current.** Generated letters show `Status:
+  Pending` while undecided and switch to `Approved`/`Rejected` with the
+  decision date, rejection reason, and remark once decided. Legacy stored
+  letters with a stale footer are upgraded on read
+  (`letter.service.js`: `composeLetterContent`).
+- **Live preview parity.** The applicant "live formal letter preview" now
+  mirrors the real server letter (addressee "The Administrator", subject
+  "Request for Leave", applicant phrasing) and uses the configured institution
+  name from `GET /api/v1/settings` instead of a hardcoded name.
+- **Dashboard uses real data.** Replaced the hardcoded "Leave Balance" quotas
+  and non-functional role tabs on the applicant dashboard with a data-derived
+  "Leave Insights" panel (approved/applied days, per-status day breakdown,
+  upcoming approved count, currently-on-leave).
+- **Admin review table upgraded.** `/admin/applications` gained LeaveHub-style
+  presentation, a **View letter** action, and **inline Approve/Reject** controls
+  for pending rows using the shared decision dialog.
+- **PDF letterhead fix.** `pdf.service.js` no longer references a nonexistent
+  `settings.institutionCode`; the letterhead code is derived from the
+  institution name.
+- **Login hardening.** Demo credentials are now emitted only in development
+  builds (`import.meta.env.DEV`); production bundles omit them and hide the
+  "Quick Test Autofill" footer.
+- **Dead code removed.** Deleted the unused `components/admin/StatusBadge.jsx`
+  and pruned unused imports across touched files.
+- **Docs refreshed.** README's API table now lists the history/summary, PDF,
+  and settings endpoints; the Testing and Known limitations sections reflect
+  Stages 0–13.
+
+### 3. Files created (Stage 13)
+
+- None.
+
+### 4. Files modified (Stage 13)
+
+Server:
+- `server/src/services/letter.service.js` — `composeLetterContent`, current-status
+  footer, legacy upgrade.
+- `server/src/services/leave.service.js` — dropped the now-unused
+  `applicationId` argument from `buildLetterContent`.
+- `server/src/services/pdf.service.js` — derived institution code.
+
+Client:
+- `client/src/pages/student/LeaveApplyPage.jsx` — preview parity + institution
+  name.
+- `client/src/pages/DashboardPage.jsx` — real Leave Insights.
+- `client/src/pages/admin/AdminApplicationsPage.jsx` — redesign + letter/inline
+  decisions.
+- `client/src/pages/LoginPage.jsx` — dev-only demo credentials.
+- `client/src/components/admin/StatusBadge.jsx` — **deleted** (unused).
+
+Docs:
+- `README.md`, `PROJECT_PROGRESS.md` — updated.
+
+### 5. Testing and verification
+
+- **PASS** — `npm test`: 27/27 backend unit tests pass (including the new
+  current-status letter tests).
+- **PASS** — `npm run build`: frontend production build succeeds.
+- **NOT TESTED** — browser-rendered interaction for the redesigned pages (no
+  headless browser in this environment); verified at the build + API level.
+
+### 6. Stage completion status
+
+COMPLETED AND VERIFIED. All Stages 0–13 are complete.
 
 
 

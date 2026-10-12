@@ -6,18 +6,16 @@ import {
   Calendar,
   CalendarClock,
   CheckCircle2,
-  Clock,
-  Download,
   FileCheck,
   FilePlus,
   FileText,
   Info,
   Loader2,
   Send,
-  Sparkles,
 } from 'lucide-react';
 import { calendarApi } from '../../services/calendarApi.js';
 import { leavesApi } from '../../services/leavesApi.js';
+import { settingsApi } from '../../services/settingsApi.js';
 import { useAuth } from '../../features/auth/AuthContext.jsx';
 
 function todayIso() {
@@ -36,6 +34,37 @@ function formatDate(isoStr) {
     return isoStr;
   }
 }
+
+function joinParts(parts) {
+  return parts.filter((part) => part && String(part).trim()).join(', ');
+}
+
+/**
+ * Mirrors the server's `describeApplicant` so the live preview matches the
+ * formal letter that is actually generated and stored on submission.
+ */
+function describeApplicant(user) {
+  if (!user) return 'the applicant';
+  if (user.role === 'student') {
+    const program = joinParts([user.course, user.department]);
+    const secondary = joinParts([
+      user.year ? `Year ${user.year}` : '',
+      user.section ? `Section ${user.section}` : '',
+    ]);
+    const affiliation = joinParts([program, secondary]);
+    const tail = affiliation ? ` from ${affiliation}` : '';
+    return `${user.name}, student (ID: ${user.studentId || 'N/A'})${tail}`;
+  }
+
+  const designationDept = joinParts([
+    user.designation,
+    user.department ? `${user.department} Department` : '',
+  ]);
+  const tail = designationDept ? `, ${designationDept}` : '';
+  return `${user.name}, teacher (ID: ${user.teacherId || 'N/A'})${tail}`;
+}
+
+const DEFAULT_INSTITUTION_NAME = 'Online Leave Management Institution';
 
 const LEAVE_TYPES = [
   { id: 'Casual Leave', label: 'Casual Leave', hint: 'Short absence for routine or casual reasons' },
@@ -85,6 +114,7 @@ export default function LeaveApplyPage() {
   const [endDate, setEndDate] = useState('');
   const [purpose, setPurpose] = useState('');
   const [errors, setErrors] = useState({});
+  const [institutionName, setInstitutionName] = useState(DEFAULT_INSTITUTION_NAME);
 
   const [range, setRange] = useState(null);
   const [rangeLoading, setRangeLoading] = useState(false);
@@ -95,6 +125,21 @@ export default function LeaveApplyPage() {
   const [result, setResult] = useState(null);
 
   const debounceRef = useRef(null);
+
+  useEffect(() => {
+    let active = true;
+    settingsApi
+      .getSettings()
+      .then((response) => {
+        if (!active) return;
+        const name = response.data?.settings?.institutionName;
+        if (name) setInstitutionName(name);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const loadRange = useCallback(async (start, end) => {
     setRangeLoading(true);
@@ -577,7 +622,7 @@ export default function LeaveApplyPage() {
               {/* Institution Header */}
               <div className="text-center border-b border-slate-200 pb-3 space-y-0.5 font-sans">
                 <h3 className="text-xs sm:text-sm font-extrabold tracking-wider text-slate-900 uppercase">
-                  Online Leave Management System
+                  {institutionName}
                 </h3>
                 <p className="text-[11px] text-slate-500 font-medium">
                   Academic Institution &bull; Official Student &amp; Faculty Services
@@ -589,49 +634,50 @@ export default function LeaveApplyPage() {
 
               {/* Addressee */}
               <div className="space-y-0.5 font-sans text-xs text-slate-700">
-                <p className="font-semibold text-slate-900">To,</p>
-                <p>The Principal / Head of Department,</p>
-                <p>{user?.department || 'Academic Department'},</p>
-                <p>Main Campus.</p>
+                <p>To</p>
+                <p className="font-semibold text-slate-900">The Administrator</p>
+                <p>{institutionName}</p>
               </div>
 
               {/* Subject */}
               <div className="font-sans font-bold text-xs text-slate-900 bg-slate-50 p-2 rounded border border-slate-100">
-                Subject: Application for {leaveType} ({startDate || 'YYYY-MM-DD'} to {endDate || 'YYYY-MM-DD'})
+                Subject: Request for Leave
               </div>
 
               {/* Salutation */}
-              <p className="font-sans text-xs">Respected Sir / Madam,</p>
+              <p className="font-sans text-xs">Respected Sir/Madam,</p>
 
               {/* Letter Content Preview */}
               <div className="font-sans text-xs text-slate-700 space-y-2 leading-normal">
                 <p>
-                  I, <strong className="text-slate-900">{user?.name || 'Applicant Name'}</strong>,{' '}
-                  {isStudent ? (
-                    <>a student of <strong>{user?.course || 'the college'}</strong> (ID: <span className="font-mono">{user?.studentId || '—'}</span>)</>
-                  ) : (
-                    <>faculty member in <strong>{user?.department || 'Department'}</strong> (ID: <span className="font-mono">{user?.teacherId || '—'}</span>)</>
-                  )}, respectfully request permission for leave of absence from{' '}
-                  <span className="font-semibold text-slate-900">{formatDate(startDate) || '[Start Date]'}</span> to{' '}
-                  <span className="font-semibold text-slate-900">{formatDate(endDate) || '[End Date]'}</span>.
+                  I am {describeApplicant(user)}. I kindly request leave from{' '}
+                  <span className="font-semibold text-slate-900">
+                    {startDate ? formatDate(startDate) : '[start date]'}
+                  </span>{' '}
+                  to{' '}
+                  <span className="font-semibold text-slate-900">
+                    {endDate ? formatDate(endDate) : '[end date]'}
+                  </span>{' '}
+                  due to{' '}
+                  <span className="font-semibold text-slate-900">
+                    {purpose.trim() ? `[${leaveType}] ${purpose.trim()}` : 'your stated reason'}
+                  </span>
+                  .
                 </p>
 
-                <p className="italic text-slate-800 bg-blue-50/50 p-2.5 rounded border border-blue-100/60">
-                  &ldquo;{purpose.trim() || 'Purpose and explanation for leave will appear here as you type…'}&rdquo;
-                </p>
+                <p>I request you to kindly consider and approve my leave application.</p>
 
-                <p>
-                  I shall ensure all pending coursework, responsibilities, or lecture assignments are duly managed during my absence. Kindly consider and approve my application.
-                </p>
+                <p>Thank you for your consideration.</p>
               </div>
 
               {/* Sign-off */}
               <div className="pt-4 font-sans text-xs text-slate-800 space-y-0.5 border-t border-slate-100">
-                <p>Yours faithfully,</p>
+                <p>Yours sincerely,</p>
                 <p className="font-bold text-slate-900">{user?.name || 'Applicant Name'}</p>
-                <p className="text-[11px] text-slate-500">
-                  {user?.department} &bull; {user?.email}
+                <p className="font-mono text-[11px] text-slate-500">
+                  {(isStudent ? user?.studentId : user?.teacherId) || 'N/A'}
                 </p>
+                <p className="text-[11px] text-slate-500">{formatDate(todayIso())}</p>
               </div>
 
               {/* Draft Watermark Badge */}

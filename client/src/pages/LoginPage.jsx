@@ -10,7 +10,6 @@ import {
   LogIn,
   ShieldAlert,
   ShieldCheck,
-  Sparkles,
   User,
   Users,
 } from 'lucide-react';
@@ -18,38 +17,44 @@ import { useAuth } from '../features/auth/AuthContext.jsx';
 import FullPageSpinner from '../components/FullPageSpinner.jsx';
 import { homePathForRole } from '../routes/roleHome.js';
 
+const IS_DEV = import.meta.env.DEV;
+
 const DEMO_PROFILES = [
   {
     role: 'student',
     label: 'Student Portal',
     icon: GraduationCap,
-    identifier: 'student1',
-    password: 'Demo@12345',
     hint: 'Enter Student Roll Number or University Email',
   },
   {
     role: 'teacher',
     label: 'Teacher / Faculty',
     icon: Users,
-    identifier: 'teacher1',
-    password: 'Demo@12345',
     hint: 'Enter Faculty Employee ID or Academic Email',
   },
   {
     role: 'admin',
     label: 'Administrator',
     icon: ShieldCheck,
-    identifier: 'admin',
-    password: 'Admin@12345',
     hint: 'Enter Administrative Username or Email',
   },
 ];
 
+// Demo credentials are only emitted in development builds. In production this
+// evaluates to an empty object and Vite removes the literals from the bundle.
+const DEMO_CREDENTIALS = IS_DEV
+  ? {
+      student: { identifier: 'student1', password: 'Demo@12345' },
+      teacher: { identifier: 'teacher1', password: 'Demo@12345' },
+      admin: { identifier: 'admin', password: 'Admin@12345' },
+    }
+  : {};
+
 export default function LoginPage() {
   const { user, initializing, login } = useAuth();
   const [selectedRole, setSelectedRole] = useState('student');
-  const [identifier, setIdentifier] = useState('student1');
-  const [password, setPassword] = useState('Demo@12345');
+  const [identifier, setIdentifier] = useState(DEMO_CREDENTIALS.student?.identifier || '');
+  const [password, setPassword] = useState(DEMO_CREDENTIALS.student?.password || '');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -64,8 +69,11 @@ export default function LoginPage() {
 
   function handleSelectRole(roleItem) {
     setSelectedRole(roleItem.role);
-    setIdentifier(roleItem.identifier);
-    setPassword(roleItem.password);
+    const credentials = DEMO_CREDENTIALS[roleItem.role];
+    if (credentials) {
+      setIdentifier(credentials.identifier);
+      setPassword(credentials.password);
+    }
     setError('');
   }
 
@@ -222,24 +230,26 @@ export default function LoginPage() {
             </div>
           </form>
 
-          {/* Quick Demo Accounts Selection Footer */}
-          <div className="border-t border-slate-100 bg-slate-50/50 p-4">
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 text-center">
-              Quick Test Autofill
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {DEMO_PROFILES.map((p) => (
-                <button
-                  key={p.role}
-                  type="button"
-                  onClick={() => handleSelectRole(p)}
-                  className="rounded-lg border border-slate-200 bg-white py-1.5 px-2 text-[11px] font-semibold text-slate-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors shadow-2xs text-center"
-                >
-                  {p.role.charAt(0).toUpperCase() + p.role.slice(1)} Demo
-                </button>
-              ))}
+          {/* Quick Demo Accounts Selection Footer (development only) */}
+          {IS_DEV && (
+            <div className="border-t border-slate-100 bg-slate-50/50 p-4">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 text-center">
+                Quick Test Autofill
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {DEMO_PROFILES.map((p) => (
+                  <button
+                    key={p.role}
+                    type="button"
+                    onClick={() => handleSelectRole(p)}
+                    className="rounded-lg border border-slate-200 bg-white py-1.5 px-2 text-[11px] font-semibold text-slate-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors shadow-2xs text-center"
+                  >
+                    {p.role.charAt(0).toUpperCase() + p.role.slice(1)} Demo
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Security Notice */}

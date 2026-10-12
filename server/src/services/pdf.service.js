@@ -1,6 +1,18 @@
 import PDFDocument from 'pdfkit';
 import InstitutionSettings from '../models/InstitutionSettings.js';
 
+/** Derive a short letterhead code (e.g. "OLM") from the institution name. */
+function deriveInstitutionCode(name) {
+  const initials = String(name || '')
+    .split(/\s+/)
+    .map((word) => word.replace(/[^A-Za-z0-9]/g, '')[0])
+    .filter(Boolean)
+    .join('')
+    .slice(0, 6)
+    .toUpperCase();
+  return initials || 'INST';
+}
+
 /**
  * Generates an official, formal PDF document for a leave application and pipes
  * it to a writable stream (e.g. Express res).
@@ -11,7 +23,7 @@ import InstitutionSettings from '../models/InstitutionSettings.js';
 export async function generateLeaveApplicationPdf(application, outputStream) {
   const settings = await InstitutionSettings.getSettings();
   const institutionName = settings.institutionName || 'Online Leave Management System';
-  const institutionCode = settings.institutionCode || 'INST';
+  const institutionCode = settings.institutionCode || deriveInstitutionCode(institutionName);
 
   const doc = new PDFDocument({
     size: 'A4',
