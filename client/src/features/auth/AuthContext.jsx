@@ -7,6 +7,7 @@ import {
   useState,
 } from 'react';
 import { apiClient, onUnauthorized } from '../../services/apiClient.js';
+import { wsClient } from '../../services/websocket.js';
 
 const AuthContext = createContext(null);
 
@@ -33,6 +34,18 @@ export function AuthProvider({ children }) {
     return unsubscribe;
   }, [refresh]);
 
+  // Connect or disconnect real-time WebSocket on user change
+  useEffect(() => {
+    if (user) {
+      wsClient.connect(user);
+    } else {
+      wsClient.disconnect();
+    }
+    return () => {
+      // wsClient cleanup handled in disconnect
+    };
+  }, [user]);
+
   const login = useCallback(async (identifier, password) => {
     const response = await apiClient.post('/auth/login', { identifier, password });
     setUser(response.data.user);
@@ -45,6 +58,7 @@ export function AuthProvider({ children }) {
     } catch {
       /* ignore network/CSRF errors on logout */
     } finally {
+      wsClient.disconnect();
       setUser(null);
     }
   }, []);

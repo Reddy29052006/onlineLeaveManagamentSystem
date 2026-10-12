@@ -3,6 +3,18 @@ import NotFoundPage from '../pages/NotFoundPage.jsx';
 import LoginPage from '../pages/LoginPage.jsx';
 import ChangePasswordPage from '../pages/ChangePasswordPage.jsx';
 import DashboardPage from '../pages/DashboardPage.jsx';
+import AdminLayout from '../layouts/AdminLayout.jsx';
+import AdminHome from '../pages/admin/AdminHome.jsx';
+import AdminUsersPage from '../pages/admin/AdminUsersPage.jsx';
+import AdminUserDetailPage from '../pages/admin/AdminUserDetailPage.jsx';
+import AdminApplicationsPage from '../pages/admin/AdminApplicationsPage.jsx';
+import AdminApplicationDetailPage from '../pages/admin/AdminApplicationDetailPage.jsx';
+import AdminCalendarPage from '../pages/admin/AdminCalendarPage.jsx';
+import ApplicantLayout from '../layouts/ApplicantLayout.jsx';
+import LeaveApplyPage from '../pages/student/LeaveApplyPage.jsx';
+import LeaveHistoryPage from '../pages/student/LeaveHistoryPage.jsx';
+import ApplicationDetailPage from '../pages/student/ApplicationDetailPage.jsx';
+import SharedCalendarPage from '../pages/calendar/SharedCalendarPage.jsx';
 import ProtectedRoute from './ProtectedRoute.jsx';
 import FullPageSpinner from '../components/FullPageSpinner.jsx';
 import { useAuth } from '../features/auth/AuthContext.jsx';
@@ -29,30 +41,64 @@ export default function AppRouter() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/admin"
         element={
           <ProtectedRoute allowedRoles={['admin']}>
-            <DashboardPage />
+            <AdminLayout />
           </ProtectedRoute>
         }
-      />
+      >
+        <Route index element={<AdminHome />} />
+        <Route path="applications" element={<AdminApplicationsPage />} />
+        <Route
+          path="applications/:id"
+          element={<AdminApplicationDetailPage />}
+        />
+        <Route path="calendar" element={<AdminCalendarPage />} />
+        <Route path="students" element={<AdminUsersPage role="student" />} />
+        <Route
+          path="students/:id"
+          element={<AdminUserDetailPage role="student" />}
+        />
+        <Route path="teachers" element={<AdminUsersPage role="teacher" />} />
+        <Route
+          path="teachers/:id"
+          element={<AdminUserDetailPage role="teacher" />}
+        />
+      </Route>
+
       <Route
         path="/student"
         element={
           <ProtectedRoute allowedRoles={['student']}>
-            <DashboardPage />
+            <ApplicantLayout />
           </ProtectedRoute>
         }
-      />
+      >
+        <Route index element={<DashboardPage />} />
+        <Route path="apply" element={<LeaveApplyPage />} />
+        <Route path="history" element={<LeaveHistoryPage />} />
+        <Route path="calendar" element={<SharedCalendarPage />} />
+        <Route path="applications/:id" element={<ApplicationDetailPage />} />
+      </Route>
+
       <Route
         path="/teacher"
         element={
           <ProtectedRoute allowedRoles={['teacher']}>
-            <DashboardPage />
+            <ApplicantLayout />
           </ProtectedRoute>
         }
-      />
+      >
+        <Route index element={<DashboardPage />} />
+        <Route path="apply" element={<LeaveApplyPage />} />
+        <Route path="history" element={<LeaveHistoryPage />} />
+        <Route path="calendar" element={<SharedCalendarPage />} />
+        <Route path="applications/:id" element={<ApplicationDetailPage />} />
+      </Route>
+
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

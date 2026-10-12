@@ -63,4 +63,5 @@ export const env = {
       ? process.env.COOKIE_SECURE === 'true'
       : nodeEnv === 'production',
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
+  auditLogEnabled: process.env.AUDIT_LOG_ENABLED !== 'false',
 };

@@ -163,12 +163,40 @@ npm run seed
 
 ## API route overview (current)
 
-| Method | Endpoint          | Access | Purpose               |
-|--------|-------------------|--------|-----------------------|
-| GET    | `/api/v1/health`  | Public | Service/database health |
+| Method | Endpoint                       | Access          | Purpose                         |
+|--------|--------------------------------|-----------------|---------------------------------|
+| GET    | `/api/v1/health`               | Public          | Service/database health         |
+| POST   | `/api/v1/auth/login`           | Public          | Sign in (session cookie + CSRF) |
+| GET    | `/api/v1/auth/me`              | Authenticated   | Current user                    |
+| POST   | `/api/v1/auth/logout`          | Authenticated   | Sign out                        |
+| POST   | `/api/v1/auth/change-password` | Authenticated   | Change own password             |
+| GET    | `/api/v1/users`                | Admin           | List/filter accounts            |
+| POST   | `/api/v1/users`                | Admin           | Create account                  |
+| GET    | `/api/v1/users/:id`            | Admin or self   | Account detail                  |
+| PATCH  | `/api/v1/users/:id`            | Admin           | Update account                  |
+| PATCH  | `/api/v1/users/:id/status`     | Admin           | Activate/deactivate             |
+| GET    | `/api/v1/users/:id/leave-summary` | Admin or self | Leave totals                    |
+| POST   | `/api/v1/leaves`               | Student/Teacher | Submit leave application        |
+| GET    | `/api/v1/leaves`               | Admin           | List/filter applications        |
+| POST   | `/api/v1/leaves/:id/approve`   | Admin           | Approve a pending application   |
+| POST   | `/api/v1/leaves/:id/reject`    | Admin           | Reject a pending application    |
+| GET    | `/api/v1/leaves/:id`           | Owner or Admin  | Read an application             |
+| GET    | `/api/v1/leaves/:id/letter`    | Owner or Admin  | Generated letter data           |
+| POST   | `/api/v1/calendar/check-range` | Authenticated   | Range warnings + day counts     |
+| GET    | `/api/v1/calendar/events`      | Authenticated   | Calendar events list            |
+| GET    | `/api/v1/calendar/events/:id`  | Authenticated   | Calendar event details          |
+| POST   | `/api/v1/calendar/events`      | Admin           | Create holiday or event         |
+| PATCH  | `/api/v1/calendar/events/:id`  | Admin           | Update holiday or event         |
+| DELETE | `/api/v1/calendar/events/:id`  | Admin           | Delete holiday or event         |
+| GET    | `/api/v1/notifications`        | Authenticated   | Current user's notifications     |
+| GET    | `/api/v1/notifications/unread-count` | Authenticated | Unread count for the bell       |
+| PATCH  | `/api/v1/notifications/:id/read` | Authenticated | Mark one notification read      |
+| PATCH  | `/api/v1/notifications/read-all` | Authenticated | Mark all notifications read     |
+| GET    | `/api/v1/dashboard/mine`       | Student/Teacher | Applicant dashboard stats        |
+| GET    | `/api/v1/dashboard/admin`      | Admin           | Admin dashboard stats           |
+| WS     | `/ws` (or `/api/v1/ws`)        | Authenticated   | Real-time WebSocket notifications|
 
-Further endpoints are added in later stages (auth, users, leaves,
-notifications, calendar, dashboard, settings).
+Further endpoints are added in later stages (history/PDF, settings).
 
 ## Testing
 
@@ -203,5 +231,8 @@ npm run build       # production build of the frontend
 
 ## Known limitations
 
-- Stage 1 only. Authentication, user management, leave workflow, notifications,
-  calendar, and reporting are not implemented yet. See `PROJECT_PROGRESS.md`.
+- Stages 0–8 are implemented and verified: configuration, models, auth/RBAC, user
+  management, leave submission with generated letters, admin review/
+  approval/rejection, notifications, role-specific dashboards with live
+  statistics, shared academic calendar with admin CRUD, and real-time
+  WebSocket streaming for notifications and status updates. See `PROJECT_PROGRESS.md`.

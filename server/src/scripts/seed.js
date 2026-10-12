@@ -2,6 +2,7 @@ import { env } from '../config/env.js';
 import { connectDatabase, disconnectDatabase } from '../config/database.js';
 import User from '../models/User.js';
 import InstitutionSettings from '../models/InstitutionSettings.js';
+import AcademicCalendarEvent from '../models/AcademicCalendarEvent.js';
 import { hashPassword } from '../utils/password.js';
 
 const ADMIN = {
@@ -96,6 +97,70 @@ async function main() {
       department: 'Computer Science',
     });
     console.log(`[seed] DEMO password for all demo accounts: ${DEMO_PASSWORD}`);
+
+    const existingEventsCount = await AcademicCalendarEvent.countDocuments();
+    if (existingEventsCount === 0) {
+      console.log('[seed] DEMO academic calendar events & holidays');
+      await AcademicCalendarEvent.create([
+        {
+          name: 'Republic Day',
+          type: 'public_holiday',
+          startDate: '2026-01-26',
+          endDate: '2026-01-26',
+          description: 'National holiday in India',
+          createdBy: admin._id,
+        },
+        {
+          name: 'Midterm Examinations',
+          type: 'academic_event',
+          startDate: '2026-03-09',
+          endDate: '2026-03-14',
+          description: 'Spring semester midterm assessments',
+          createdBy: admin._id,
+        },
+        {
+          name: 'Annual Cultural Festival',
+          type: 'academic_event',
+          startDate: '2026-04-10',
+          endDate: '2026-04-11',
+          description: 'University annual cultural fest',
+          createdBy: admin._id,
+        },
+        {
+          name: 'Independence Day',
+          type: 'public_holiday',
+          startDate: '2026-08-15',
+          endDate: '2026-08-15',
+          description: 'National holiday in India',
+          createdBy: admin._id,
+        },
+        {
+          name: 'Gandhi Jayanti',
+          type: 'public_holiday',
+          startDate: '2026-10-02',
+          endDate: '2026-10-02',
+          description: 'Mahatma Gandhi birthday holiday',
+          createdBy: admin._id,
+        },
+        {
+          name: 'Semester End Examinations',
+          type: 'academic_event',
+          startDate: '2026-11-16',
+          endDate: '2026-11-28',
+          description: 'End-semester final examinations',
+          createdBy: admin._id,
+        },
+        {
+          name: 'Winter Break',
+          type: 'institution_holiday',
+          startDate: '2026-12-24',
+          endDate: '2026-12-31',
+          description: 'Institution year-end vacation',
+          createdBy: admin._id,
+        },
+      ]);
+      console.log('  created  7 demo academic calendar events');
+    }
   } else {
     console.log('[seed] demo data skipped (set SEED_DEMO_DATA=true to include test accounts)');
   }

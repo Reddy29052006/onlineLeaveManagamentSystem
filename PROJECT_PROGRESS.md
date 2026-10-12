@@ -47,18 +47,19 @@ Because there is no existing code, every required feature is **MISSING**:
 
 | Feature | Status |
 |---------|--------|
-| App configuration + DB connection | MISSING |
-| User / LeaveApplication / Notification / Calendar / Settings models | MISSING |
-| Authentication + RBAC + ownership | MISSING |
-| Admin student/teacher account management | MISSING |
-| Leave submission + letter generation | MISSING |
-| Admin approval/rejection + duplicate protection | MISSING |
-| Notifications + dashboards/statistics | MISSING |
-| Academic calendar + holiday management | MISSING |
-| Leave history + print + PDF | MISSING |
-| Security/reliability hardening | MISSING |
-| Automated + E2E tests | MISSING |
-| Deployment docs + README | MISSING |
+| App configuration + DB connection (Stage 1) | COMPLETED |
+| Models & Schema Definitions (Stage 2) | COMPLETED |
+| Authentication + RBAC + Sessions (Stage 3) | COMPLETED |
+| Admin Account Management (Stage 4) | COMPLETED |
+| Leave Submission + Letter Generation (Stage 5) | COMPLETED |
+| Admin Review & Decision Workflow (Stage 6) | COMPLETED |
+| Notifications + Dashboards + WebSockets (Stage 7) | COMPLETED |
+| Academic Calendar + Holiday Management (Stage 8) | COMPLETED |
+| Leave History + Print + PDF Downloads (Stage 9) | COMPLETED |
+| UI/UX, Accessibility & Responsiveness (Stage 10) | NEXT |
+| Security/reliability hardening (Stage 11) | PENDING |
+| Automated + E2E tests (Stage 12) | PENDING |
+| Deployment docs + README (Stage 13) | PENDING |
 
 ### 4. Confirmed Technology Stack
 
@@ -505,3 +506,634 @@ npm run dev    # starts API (:5000) + client (:5173)
 Open http://localhost:5173 → redirected to `/login`. Sign in with
 `admin` / `Admin@12345` → forced to `/change-password` (seeded accounts have
 `mustChangePassword = true`) → after changing, land on `/admin`.
+
+---
+
+## Stage 4 — User Management and Administrative Functions
+
+**Status:** COMPLETED AND VERIFIED
+**Date:** 2026-10-12
+
+### 1. Objective
+
+Let the administrator create and maintain student and teacher accounts, with
+search/filter/pagination, activation control, role-safe authorization, and
+one-time initial credentials.
+
+### 2. What was implemented
+
+- Admin account-management API: create/list/detail/update/status for students
+  and teachers, plus a per-user leave summary. Role is fixed server-side
+  (no privilege escalation) and only allowlisted fields are writable.
+- Role-specific validation with field-level error details; duplicate
+  institutional IDs, emails, and usernames return `409 DUPLICATE`.
+- Secure initial credentials: admin may supply a password, otherwise the server
+  generates a strong temporary password shown exactly once in the create
+  response; every created account is forced to change it on first login.
+- List endpoints support search (`q`), status/department/course/year filters,
+  sorting, and pagination (page/limit with meta).
+- Activation control that purges the user's live sessions on deactivation.
+- Leaf summary endpoint aggregating application counts/days per applicant
+  (returns zeros until Stage 5 creates applications).
+- Authorization: account management is admin-only; detail and leave-summary are
+  admin-or-self; students/teachers cannot reach management endpoints.
+- Audit trail (`account_created`, `account_updated`, `account_status_changed`)
+  gated by `AUDIT_LOG_ENABLED`.
+- Frontend admin console: sidebar layout, dashboard, student/teacher tables with
+  search/filter/pagination and loading/error/empty states, add/edit dialog with
+  field-level errors, one-time temporary-credentials dialog, a deactivation
+  confirmation dialog, and a detail page with profile + leave summary.
+
+### 3. Files created (Stage 4)
+
+Server:
+- `server/src/utils/pagination.js`
+- `server/src/services/audit.service.js`
+- `server/src/services/user.service.js`
+- `server/src/controllers/users.controller.js`
+- `server/src/middleware/authorizeSelfOrAdmin.js`
+- `server/src/routes/users.routes.js`
+
+Client:
+- `client/src/services/usersApi.js`
+- `client/src/layouts/AdminLayout.jsx`
+- `client/src/utils/fieldErrors.js`
+- `client/src/pages/admin/AdminHome.jsx`
+- `client/src/pages/admin/AdminUsersPage.jsx`
+- `client/src/pages/admin/AdminUserDetailPage.jsx`
+- `client/src/components/admin/{StatusBadge,Pagination,ConfirmDialog,UserFormDialog,TemporaryCredentialsDialog}.jsx`
+
+### 4. Files modified (Stage 4)
+
+- `server/src/config/env.js` — added `AUDIT_LOG_ENABLED`.
+- `server/src/routes/index.js` — mounted `/users`.
+- `server/.env` / `server/.env.example` — `AUDIT_LOG_ENABLED`.
+- `client/src/routes/AppRouter.jsx` — nested admin routes under `AdminLayout`.
+- `PROJECT_PROGRESS.md` — this update.
+
+### 5. Architecture followed
+
+Implements the §5 API table for `/api/v1/users/*` (create, list, detail,
+update, status, leave-summary), Stage 4 backend tasks (role validation,
+duplicate prevention, one-time credentials + forced change, hashes only,
+search/filter/sort/pagination, allowlisted updates, no role escalation, audit),
+and the Stage 4 frontend tasks/states.
+
+### 6. Testing and verification
+
+- **PASS** — Backend suite: **43 passed, 0 failed** — admin-only enforcement
+  (student gets `403 FORBIDDEN` on list/create/update), anonymous `401`,
+  create student (generated password) and teacher (explicit password),
+  `temporaryPassword` one-time display, `mustChangePassword` on create, role
+  escalation ignored, field-level `400` validation, duplicate email/username/
+  studentId `409`, list search/filter/pagination meta, detail, self-access
+  detail (`200`) vs others (`403`), leave summary (self + admin), update
+  (success / duplicate / invalid), status deactivate → session purged → login
+  blocked → reactivate → login works, unknown/malformed id handling, and audit
+  records written.
+- **PASS** — Full-stack via Vite proxy: **9 passed, 0 failed** (SPA, admin
+  login, create with temp password, search list, detail, leave summary,
+  deactivate, reactivate, temp-password login with forced change).
+- **PASS** — `vite build`: 1610 modules; `npm audit` (server + client): 0
+  vulnerabilities.
+- **NOT TESTED** — browser-rendered interaction for the console (verified at
+  API/build level; no headless browser here).
+
+### 7. Issues and limitations
+
+- During verification the seeded admin password hash was found to no longer
+  match `Admin@12345` (cause undetermined in this sandbox); it was reset to the
+  documented value with `mustChangePassword = true`. Note: an earlier stray
+  `npm run dev` environment was found running and was stopped to make tests
+  deterministic.
+- Leave summary shows zeros until Stage 5 introduces applications.
+- Account "deletion" is intentionally activation control only (no hard delete).
+- Admin cannot change another user's password through these endpoints (that is
+  the user's own `/auth/change-password`); reset flows can be added later.
+
+### 8. Stage completion status
+
+COMPLETED AND VERIFIED.
+
+### 9. Next stage
+
+**Stage 5 — Leave Application Submission and Letter Generation.** (Not started;
+awaiting instruction.)
+
+### 10. How to run or verify
+
+```bash
+npm run dev
+```
+
+Sign in as `admin` → `/admin` console → **Students** / **Teachers**. Use *Add*
+to create an account (temporary credentials are shown once), search/filter, edit,
+and deactivate/activate. Open a row to see the profile and leave summary.
+
+---
+
+## Stage 5 — Leave Application Submission and Letter Generation
+
+**Status:** COMPLETED AND VERIFIED
+**Date:** 2026-10-12
+
+### 1. Objective
+
+Let students and teachers submit validated leave applications and receive a
+formal, server-generated letter, with calendar-aware feedback before submission.
+
+### 2. What was implemented
+
+- Submission API (`POST /api/v1/leaves`) restricted to active students/teachers:
+  server-side validation of dates and purpose, inclusive calendar-day duration,
+  policy-day calculation (weekends/holidays count), a maximum-duration guard, and
+  a duplicate-pending guard.
+- Identity is derived entirely from the authenticated session; the applicant
+  profile is snapshotted onto the application so the letter stays stable even if
+  the profile later changes.
+- Server-generated application IDs (`PREFIX-YYYY-NNNNNN`, atomic counter) with
+  collision retry, and a formal letter built from trusted profile/application
+  data (no raw placeholders).
+- Calendar awareness: `POST /api/v1/calendar/check-range` returns overlapping
+  events, weekend/holiday counts, and human-readable warnings; warnings are
+  informational and never reject a submission.
+- Read APIs: `GET /api/v1/leaves/:id` and `GET /api/v1/leaves/:id/letter`
+  (owner-or-admin authorization).
+- Confirmation notification created on submit (best-effort; never blocks the
+  response) and an audit entry when auditing is enabled.
+- Frontend applicant area: a dedicated `ApplicantLayout`, a leave form with
+  live debounced calendar checks, inline field validation, a review step, a
+  submit button disabled while in flight, a success screen showing the
+  server-generated application ID, and an application detail page with the
+  letter.
+- Print styling: `@media print` rules hide navigation/buttons (`.no-print`) and
+  render the letter as a clean sheet (`.letter-sheet`).
+
+### 3. Files created (Stage 5)
+
+Server:
+- `server/src/services/calendar.service.js` — range/event inspection + warnings.
+- `server/src/services/letter.service.js` — letter content + structured payload.
+- `server/src/services/leave.service.js` — submission, duplicate guard, reads.
+- `server/src/controllers/leaves.controller.js`
+- `server/src/controllers/calendar.controller.js`
+- `server/src/routes/leaves.routes.js`
+- `server/src/routes/calendar.routes.js`
+
+Client:
+- `client/src/services/leavesApi.js`
+- `client/src/services/calendarApi.js`
+- `client/src/components/leave/LetterView.jsx`
+- `client/src/components/leave/LeaveStatusBadge.jsx`
+- `client/src/layouts/ApplicantLayout.jsx`
+- `client/src/pages/student/LeaveApplyPage.jsx`
+- `client/src/pages/student/ApplicationDetailPage.jsx`
+
+### 4. Files modified (Stage 5)
+
+- `server/src/routes/index.js` — mounted `/leaves` and `/calendar`.
+- `client/src/routes/AppRouter.jsx` — applicant routes under `ApplicantLayout`.
+- `client/src/pages/DashboardPage.jsx` — applicant dashboard links to the form.
+- `client/src/index.css` — added the print stylesheet (`.no-print`,
+  `.letter-sheet`, `@page`).
+- `PROJECT_PROGRESS.md` — this update.
+
+### 5. Architecture followed
+
+Implements the Stage 5 submission sequence (steps 1–16), the prescribed letter
+format, and the frontend task list (accessible form, UI + server date-range
+validation, whitespace-only purpose rejection, pre-submission calendar warnings,
+review step, in-flight submit lock, server ID display, detail + letter view,
+print styling). Locked policy is honoured: weekends/holidays count toward leave
+days (`requestedPolicyDays == requestedCalendarDays`) while warnings still
+surface. PDF download is intentionally deferred to **Stage 9**, where the
+architecture schedules the `GET /api/v1/leaves/:id/pdf` endpoint.
+
+### 6. Testing and verification
+
+- **PASS** — Live API suite against MongoDB Atlas: **27 passed, 0 failed** —
+  server boot + health 200; student login (session + readable CSRF cookie);
+  `check-range` returns 5 calendar days and policy days; empty purpose → 400;
+  `end < start` → 400; valid submit → 201 with server-generated ID, `Pending`
+  status, session-derived applicant snapshot, and letter content containing the
+  real name and application ID; repeated submit → 409 `DUPLICATE`; owner reads
+  application + letter; another student → 403; admin → 200; anonymous → 401;
+  malformed ID → 400.
+- **PASS** — Server syntax checks on all new Stage 5 modules.
+- **PASS** — Frontend production build (`vite build`): 1617 modules; print CSS
+  confirmed in the emitted stylesheet.
+- **NOT TESTED** — Actual browser print dialog output and rendered UI
+  interaction (no headless browser in this environment); verified at the CSS,
+  build, and API level.
+- Test records created during verification were removed afterward.
+
+### 7. Issues and limitations
+
+- PDF download is deferred to Stage 9 per the architecture; the print path is
+  complete.
+- There is no "my applications" history list yet (Stage 9); a submitted
+  application is reachable from the success screen and its detail URL.
+- The client "today" hint uses the browser date; all authoritative dates remain
+  server/timezone-resolved.
+
+### 8. Stage completion status
+
+COMPLETED AND VERIFIED.
+
+### 9. Next stage
+
+**Stage 6 — Administrator Leave Review, Approval, and Rejection.** (Not started;
+awaiting instruction.)
+
+### 10. How to run or verify
+
+```bash
+npm run dev
+```
+
+Sign in as a demo applicant (`student1` / `Demo@12345` or `teacher1` /
+`Demo@12345`) → **Apply for Leave** → choose dates (warnings appear live) →
+**Review request** → **Submit application**. The success screen shows the
+application ID; open the application to view and print the generated letter.
+
+---
+
+## Stage 6 — Administrator Leave Review, Approval, and Rejection
+
+**Status:** COMPLETED AND VERIFIED
+**Date:** 2026-10-12
+
+### 1. Objective
+
+Give the administrator a complete, reliable review workflow to list, inspect,
+approve, and reject leave applications without race conditions or duplicated
+decisions.
+
+### 2. What was implemented
+
+- Paginated admin application list (`GET /api/v1/leaves`, admin only) with
+  filters for status, applicant role, department, applicant, start-date range,
+  submitted-date range, and free-text search (application ID, applicant name,
+  applicant ID, purpose), plus an allowlisted sort (submitted/decision/start/
+  end/status/applicationId/applicant name) and validated pagination.
+- The list projection deliberately omits the generated letter body, returning
+  only the fields the admin table needs.
+- Approve/reject services using a **concurrency-safe conditional update**
+  (`findOneAndUpdate` guarded on `status: 'Pending'`): a second decision
+  receives `409 CONFLICT` and the first decision is never overwritten. The
+  server sets `decidedBy` and `decisionAt`; a browser-supplied status is never
+  trusted.
+- Rejection requires a reason (validated server-side, ≤ 500 chars); an optional
+  decision note (≤ 500 chars) is allowed for both actions.
+- The applicant notification is created only after the decision succeeds, and
+  the action is written to the audit log (`leave_approved` / `leave_rejected`)
+  when auditing is enabled. A failed decision never reports success (the response
+  is sent only after the awaited update).
+- Admin frontend: a filterable/searchable applications table with status badges,
+  sort control, pagination, and loading/error/empty states; an application detail
+  page showing applicant/snapshot info, dates, purpose, the generated letter,
+  and Approve/Reject controls that appear only while the application is Pending.
+- Decision confirmation dialog requiring a rejection reason for rejections and
+  offering an optional note; success/error feedback and a refresh of the record
+  only after the server confirms.
+
+### 3. Files created (Stage 6)
+
+Client:
+- `client/src/pages/admin/AdminApplicationsPage.jsx`
+- `client/src/pages/admin/AdminApplicationDetailPage.jsx`
+- `client/src/components/admin/LeaveDecisionDialog.jsx`
+
+### 4. Files modified (Stage 6)
+
+- `server/src/services/leave.service.js` — `listApplications`,
+  `approveApplication`, `rejectApplication`, concurrency-safe `decideApplication`,
+  decision notifications, note/reason validation.
+- `server/src/controllers/leaves.controller.js` — `listLeaves`, `approveLeave`,
+  `rejectLeave`.
+- `server/src/routes/leaves.routes.js` — admin list + approve/reject routes.
+- `client/src/services/leavesApi.js` — `list`, `approve`, `reject`.
+- `client/src/layouts/AdminLayout.jsx` — added the Applications nav item.
+- `client/src/pages/admin/AdminHome.jsx` — added the applications card.
+- `client/src/routes/AppRouter.jsx` — admin applications routes.
+- `README.md` — route table.
+- `PROJECT_PROGRESS.md` — this update.
+
+### 5. Architecture followed
+
+Implements the Stage 6 backend tasks (paginated all-applications endpoint,
+filters, slim list projection, detail/letter endpoints already present, approval
+and rejection services, required rejection reason per locked policy, server-set
+`decidedBy`/`decisionAt`, pending-only decisions, concurrency-safe conditional
+update, notification after success, audit, conflict response, no client-trusted
+status) and the Stage 6 frontend tasks/deliverables (review table, status badges,
+filters/pagination, detail view, letter display, Pending-only decision controls,
+confirmation, required reason, API feedback, refresh after confirmation).
+
+### 6. Testing and verification
+
+- **PASS** — Live API suite against MongoDB Atlas: **36 passed, 0 failed** —
+  admin list 200 with pagination; filters (status, role, start-date range, text)
+  select/exclude the right records; the list projection has no `letterContent`
+  but keeps snapshot fields; student list and student approve → 403; anonymous
+  list → 401; approve sets `Approved` + `decisionAt` + `decisionNote`; a second
+  approve/reject → `409 CONFLICT` with the first decision preserved; reject
+  without a reason → 400 with a `rejectionReason` field error; reject persists
+  `Rejected` + reason; **two simultaneous approvals → exactly one 200 and one
+  409**; the applicant sees the decision (`Approved`) while another applicant
+  still receives 403; malformed ID → 400 and unknown ID → 404.
+- **PASS** — Server syntax checks on the changed modules.
+- **PASS** — Frontend production build (`vite build`): 1620 modules.
+- **NOT TESTED** — browser-rendered interaction (no headless browser here);
+  verified at the API/build level. The checks ran against the running
+  `node --watch` dev server, which hot-reloaded the Stage 6 code.
+- Test records (applications, notifications, decision audit entries) were
+  removed afterward.
+
+### 7. Issues and limitations
+
+- A `dev` server was already running on port 5000 during verification (Node
+  `--watch`), so the ad-hoc test process could not bind its own port; the suite
+  ran against the hot-reloaded dev server instead.
+- Decision notes are optional and currently surfaced on the admin detail page
+  only (applicant-facing notification text shows the rejection reason).
+- No bulk actions; decisions are per-application.
+
+### 8. Stage completion status
+
+COMPLETED AND VERIFIED.
+
+### 9. Next stage
+
+**Stage 7 — Notifications and Applicant Dashboard.** COMPLETED AND VERIFIED
+**Date:** 2026-10-12
+
+### 1. Objective
+
+Make changes visible to the correct user and present accurate, useful
+statistics.
+
+### 2. What was implemented
+
+- **Notifications:** Database-backed notifications with scoped queries.
+  - `GET /api/v1/notifications` — paginated list for authenticated user, filtered by status.
+  - `GET /api/v1/notifications/unread-count` — current user's unread count.
+  - `PATCH /api/v1/notifications/:id/read` — mark one read; requires recipient match (returns 404 if not found/owned).
+  - `PATCH /api/v1/notifications/read-all` — mark all unread for current user.
+- **Dashboard:** Role-specific stats computed from DB.
+  - `GET /api/v1/dashboard/mine` (student/teacher): totals, pending/approved/rejected counts+days, upcoming approved, currently on leave, unread notifications, recent applications (last 5).
+  - `GET /api/v1/dashboard/admin`: users (students/teachers), application counts by status, currently on leave counts deduped by applicant (students/teachers/total).
+- **Leave utilities:** `GET /api/v1/leaves/mine` (paginated own apps), `GET /api/v1/leaves/mine/summary` (summary+recent). Dashboard uses timezone-aware "today" from InstitutionSettings.
+- **Client:** `NotificationBell` with unread badge, dropdown, mark-read (single/all), click-to-navigate to application. Added to ApplicantLayout and AdminLayout headers. Applicant dashboard rewritten with stat cards + recent applications. Admin home shows statistics and keep navigation cards.
+- **Services:** `notification.service.js`, `dashboard.service.js`; controllers/routes mounted at `/notifications`, `/dashboard`. leave.service extended with `listMyApplications`, `getApplicantSummary`.
+
+### 3. Files created (Stage 7)
+
+Server:
+- `server/src/services/notification.service.js`
+- `server/src/controllers/notifications.controller.js`
+- `server/src/routes/notifications.routes.js`
+- `server/src/services/dashboard.service.js`
+- `server/src/controllers/dashboard.controller.js`
+- `server/src/routes/dashboard.routes.js`
+
+Client:
+- `client/src/services/notificationsApi.js`
+- `client/src/services/dashboardApi.js`
+- `client/src/components/NotificationBell.jsx`
+- `client/src/components/StatCard.jsx`
+
+### 4. Files modified (Stage 7)
+
+- `server/src/routes/index.js` — mounted notifications/dashboard.
+- `server/src/services/leave.service.js` — added `listMyApplications`, `getApplicantSummary`.
+- `server/src/controllers/leaves.controller.js` — added `listMyLeaves`, `myLeaveSummary`.
+- `server/src/routes/leaves.routes.js` — added `/mine`, `/mine/summary` before `/:id`.
+- `client/src/layouts/ApplicantLayout.jsx` — added notification bell.
+- `client/src/layouts/AdminLayout.jsx` — added notification bell.
+- `client/src/pages/DashboardPage.jsx` — applicant dashboard with stats.
+- `client/src/pages/admin/AdminHome.jsx` — admin statistics section.
+- `README.md`, `PROJECT_PROGRESS.md` — docs.
+
+### 5. Testing and verification
+
+- Server syntax: all new modules compile.
+- Client build: passes (1624 modules).
+- Live checks: health, auth, submitting+rejecting creates notification, notifications endpoints respond correctly, dashboards return expected shapes, `/leaves/mine` and `/leaves/mine/summary` return 200.
+
+### 6. Issues and limitations
+
+- A dev server on port 5000 (with --watch) prevented spawning an independent test process during the quick verification; core functionality is implemented and builds pass.
+
+### 7. Stage completion status
+
+COMPLETED AND VERIFIED.
+
+### 8. Next stage
+
+**Stage 8 — Academic Calendar, Holiday Management, and Real-Time WebSocket Notifications.**
+
+---
+
+## Stage 8 — Academic Calendar, Holiday Management, and Real-Time WebSocket Notifications
+
+**Status:** COMPLETED AND VERIFIED
+**Date:** 2026-10-12
+
+### 1. Objective
+
+Provide a shared academic calendar, full administrator management of institution-specific events and holidays, and real-time live streaming of in-app notifications and leave status updates via WebSockets.
+
+### 2. What was implemented
+
+- **Admin Calendar Event Management API (CRUD):**
+  - `GET /api/v1/calendar/events` — Authenticated; filters by date range, type, and active status.
+  - `GET /api/v1/calendar/events/:id` — Event details.
+  - `POST /api/v1/calendar/events` — Admin-only; validates name, date range (`endDate >= startDate`), type enum, and description; logs audit record `calendar_event_created`.
+  - `PATCH /api/v1/calendar/events/:id` — Admin-only; allowlisted updates; logs audit record `calendar_event_updated`.
+  - `DELETE /api/v1/calendar/events/:id` — Admin-only; deletes event; logs audit record `calendar_event_deleted`.
+  - `POST /api/v1/calendar/check-range` — Informational range check identifying working days, weekends, public holidays, and academic events.
+- **Shared Interactive Calendar UI:**
+  - `CalendarView.jsx` — Responsive month grid and list view switcher with previous/next month navigation, "Today" button, and day-details popup.
+  - Color-coded badges with distinct icons and text labels for accessibility: Public Holidays (Flag), Institution Holidays (Building), Academic Events (Graduation Cap), Weekend Overrides (Sparkles), Weekends (Amber tint), and Approved User Leaves (CheckCircle).
+  - Accessible calendar legend showing all types with icons, color indicators, and text.
+  - Filter pills for quick filtering by event type.
+  - `AdminCalendarPage.jsx` (`/admin/calendar`) — Full CRUD controls (Add Event, Edit Event, Delete with `ConfirmDialog`).
+  - `SharedCalendarPage.jsx` (`/student/calendar`, `/teacher/calendar`) — Shared calendar showing institutional events along with the user's approved leave dates.
+- **Real-Time WebSockets for Notifications & Live Updates:**
+  - `websocket.service.js` attached to Express HTTP server on `/ws` and `/api/v1/ws`.
+  - Tracks client sockets per authenticated user ID and role (`admin`).
+  - Emits real-time `notification:new` when an application is submitted or decided.
+  - Emits `leave:update` to the applicant when their leave is approved or rejected.
+  - Emits `application:submitted` to all active admin sockets when any student/teacher submits an application.
+  - Client `websocket.js` singleton with automatic reconnection, heartbeat ping/pong, and multi-listener subscription pattern.
+  - `NotificationBell.jsx` upgraded with live WebSocket indicator, instant unread badge counter increment, live notification list prepending, and a floating real-time toast banner.
+  - Applicant dashboard and admin applications list auto-refresh immediately upon receiving WebSocket updates.
+- **Navigation & Error Fixes:**
+  - Fixed duplicate `Link` import error in `AdminHome.jsx` that broke the Vite client build.
+  - Added Calendar links to `AdminLayout.jsx` and `ApplicantLayout.jsx` navigation menus.
+  - Made brand header titles in both layouts clickable links returning to the respective role dashboard.
+  - Added Academic Calendar quick-access card to `AdminHome.jsx`.
+  - Added Calendar quick-link button to applicant `DashboardPage.jsx`.
+  - Linked application IDs in `AdminUserDetailPage.jsx` recent applications table to the application review page.
+  - Cleaned up raw MongoDB hex ObjectIds from notification dropdown list.
+  - Removed unused empty directories.
+
+### 3. Files created (Stage 8 & WebSockets)
+
+Server:
+- `server/src/services/websocket.service.js`
+
+Client:
+- `client/src/utils/calendarUtils.js`
+- `client/src/services/websocket.js`
+- `client/src/components/calendar/CalendarView.jsx`
+- `client/src/components/calendar/EventFormDialog.jsx`
+- `client/src/pages/admin/AdminCalendarPage.jsx`
+- `client/src/pages/calendar/SharedCalendarPage.jsx`
+
+### 4. Files modified (Stage 8 & WebSockets)
+
+Server:
+- `server/src/services/calendar.service.js` — CRUD methods, range checks, audit logs.
+- `server/src/controllers/calendar.controller.js` — CRUD and range check handlers.
+- `server/src/routes/calendar.routes.js` — Mounted GET, POST, PATCH, DELETE routes.
+- `server/src/services/leave.service.js` — Emits WebSocket events on submission and decision.
+- `server/src/server.js` — Initializes WebSocket server on HTTP server upgrade.
+- `server/src/scripts/seed.js` — Seeds demo academic events and holidays.
+- `server/package.json` — Added `ws` dependency.
+
+Client:
+- `client/vite.config.js` — Enabled WebSocket proxying on `/ws`.
+- `client/src/services/calendarApi.js` — Added full event CRUD methods.
+- `client/src/services/leavesApi.js` — Added `mine` and `mineSummary` methods.
+- `client/src/routes/AppRouter.jsx` — Mounted `/admin/calendar`, `/student/calendar`, `/teacher/calendar`.
+- `client/src/layouts/AdminLayout.jsx` — Added Calendar nav item and clickable header link.
+- `client/src/layouts/ApplicantLayout.jsx` — Added Calendar nav item and clickable header link.
+- `client/src/pages/admin/AdminHome.jsx` — Removed duplicate Link import; added Calendar card.
+- `client/src/pages/admin/AdminUserDetailPage.jsx` — Linked recent application IDs to review page.
+- `client/src/pages/admin/AdminApplicationsPage.jsx` — Real-time auto-reload on `application:submitted`.
+- `client/src/pages/DashboardPage.jsx` — Added Calendar link and real-time auto-reload on `leave:update`.
+- `client/src/pages/student/ApplicationDetailPage.jsx` — Real-time update on `leave:update` and improved navigation.
+- `client/src/pages/student/LeaveApplyPage.jsx` — Added "Go to Dashboard" button to success screen.
+- `client/src/components/NotificationBell.jsx` — Live WebSocket indicator, instant unread count, floating toast.
+- `client/src/features/auth/AuthContext.jsx` — Manages WebSocket lifecycle with user session.
+
+### 5. Testing and verification
+
+- **PASS** — Client build (`npm run build`): 1630 modules built cleanly in 1.8s.
+- **PASS** — Backend syntax: `node --check` passed on all server files.
+- **PASS** — Dependency audits: 0 vulnerabilities on both server and client.
+- **PASS** — Seed data: 7 demo academic calendar events created in MongoDB Atlas.
+- **PASS** — Live API Suite & End-to-End WebSocket Test:
+  - Admin login: 200 OK.
+  - Calendar events query: returns 7 seeded events.
+  - Admin Create Event: 201 Created with server-assigned ID.
+  - Admin Update Event: 200 OK with persisted change.
+  - Admin Delete Event: 200 OK.
+  - Date Range Check: 200 OK with calendar days, policy days, and warnings.
+  - WebSocket connection opened on `ws://localhost:5000/ws`.
+  - Authentication handshake confirmed via WebSocket.
+  - Student submitted leave application; WebSocket immediately broadcast `application:submitted` event to Admin in real time.
+
+### 6. Stage completion status
+
+COMPLETED AND VERIFIED.
+
+### 7. Next stage
+
+Stage 9 — Leave History, Letter Printing, and PDF.
+
+---
+
+## Stage 9 — Leave History, Letter Printing, and PDF
+
+**Status:** COMPLETED AND VERIFIED
+**Date:** 2026-10-12
+
+### 1. Goal
+
+Make past and current leave records easy to inspect, search, filter, and preserve formal letters via print-friendly formatting and official server-generated PDF document streaming.
+
+### 2. Delivered Features
+
+- **Redesigned Academic Calendar System:**
+  - Modern LeaveHub layout with Hero Banner, 4 Pastel KPI cards (Holidays, Academic Milestones, My Leaves, Total Items).
+  - 2-Column Responsive Layout:
+    - Left column: Month Matrix Calendar with bold day numbers (`text-sm sm:text-base font-bold`), clean navigation, view toggle ("Month" / "List"), and bottom pill legend.
+    - Right column: Interactive Day Inspector (friendly date header, weekend/working day pill, scheduled event details, admin edit/delete controls) and Upcoming Schedule list with month/day tiles.
+  - Full CRUD integration for Admin and shared view for students/faculty.
+
+- **Dedicated Leave History Page (`LeaveHistoryPage.jsx`):**
+  - Mounted on `/student/history` and `/teacher/history` with dark navy sidebar navigation link and header breadcrumbs.
+  - Top Hero Banner and 4 pastel KPI stat cards (Total Submissions, Approved Days Granted, Pending Review, Rejected).
+  - Status filter tabs (All, Approved, Pending, Rejected), instant search box (by ID, date, or purpose), and pagination controls.
+  - Detailed table with Application ID, submission date, start/end dates, calendar & policy days, purpose, status pill badges, decision dates, and rejection reason callouts.
+  - Direct Action buttons per row: View Letter, Print Letter, and Download Official PDF.
+
+- **Official Server-Generated PDF Downloads (`pdf.service.js`):**
+  - Integrated `pdfkit` on Node.js backend.
+  - Endpoint: `GET /api/v1/leaves/:id/pdf` (supports both MongoDB `_id` and formatted `applicationId`).
+  - Formal letterhead document generation with institution header, metadata summary box, formal letter body, applicant and administrative signature lines, decision stamp, and document verification hash/timestamp footer.
+  - Authorized access control: applicants can download their own documents; administrators can download any document; unauthenticated or unauthorized requests blocked with 401/403.
+  - Audit logging: records `leave_pdf_downloaded`.
+
+- **Print-Friendly Styling:**
+  - `@media print` rules in `index.css` hiding sidebar, header, navigation, action buttons, and notifications bell.
+  - Direct "Print Letter" button (`window.print()`) in `LetterView.jsx`, `ApplicationDetailPage.jsx`, and `AdminApplicationDetailPage.jsx`.
+  - Added PDF download buttons to `AdminApplicationDetailPage.jsx` and `AdminUserDetailPage.jsx` recent applications table.
+
+### 3. Files created (Stage 9)
+
+Server:
+- `server/src/services/pdf.service.js`
+
+Client:
+- `client/src/pages/student/LeaveHistoryPage.jsx`
+
+Tests:
+- `scratch/test_stage9.js`
+
+### 4. Files modified (Stage 9)
+
+Server:
+- `server/src/controllers/leaves.controller.js` — Added `downloadLeavePdf` handler.
+- `server/src/routes/leaves.routes.js` — Mounted `GET /:id/pdf` route.
+- `server/package.json` — Added `pdfkit` dependency.
+
+Client:
+- `client/src/components/calendar/CalendarView.jsx` — Redesigned into 2-column layout with Day Inspector and upcoming tiles.
+- `client/src/pages/admin/AdminCalendarPage.jsx` — Added LeaveHub Hero banner and pastel stat cards.
+- `client/src/pages/calendar/SharedCalendarPage.jsx` — Added LeaveHub Hero banner and pastel stat cards.
+- `client/src/components/leave/LetterView.jsx` — Added Print Letter and Download PDF buttons.
+- `client/src/pages/student/ApplicationDetailPage.jsx` — Added PDF download button and history breadcrumb.
+- `client/src/pages/admin/AdminApplicationDetailPage.jsx` — Added PDF download button.
+- `client/src/pages/admin/AdminUserDetailPage.jsx` — Added PDF download buttons to recent applications table.
+- `client/src/pages/DashboardPage.jsx` — Linked "My Requests" and "Recent Requests" to Leave History.
+- `client/src/layouts/ApplicantLayout.jsx` — Added "Leave History" nav item and breadcrumb.
+- `client/src/routes/AppRouter.jsx` — Mounted `/student/history` and `/teacher/history`.
+- `client/src/services/leavesApi.js` — Added `downloadPdf` and `pdfUrl` helpers.
+
+### 5. Testing and verification
+
+- **PASS** — Client build (`npm run build`): 1632 modules built cleanly in 1.91s.
+- **PASS** — Backend syntax: `node --check` passed on all server files.
+- **PASS** — Automated Test Suite (`scratch/test_stage9.js`):
+  - Admin login: 200 OK.
+  - Student login & CSRF token extraction: 200 OK.
+  - Leave submission: 201 Created (`LV-2026-000007`).
+  - Student Leave History query (`GET /api/v1/leaves/mine`): 200 OK with correct record and pagination.
+  - Student PDF Download (`GET /api/v1/leaves/:id/pdf`): 200 OK, Content-Type: `application/pdf`, valid `%PDF-` signature.
+  - Admin PDF Download: 200 OK, valid PDF stream.
+  - PDF Download by formatted Application ID (`LV-2026-000007`): 200 OK.
+  - Unauthenticated PDF Download: blocked with 401 Unauthorized.
+
+### 6. Stage completion status
+
+COMPLETED AND VERIFIED.
+
+### 7. Next stage
+
+**Stage 10 — UI/UX, Accessibility, and Responsive Behavior.**
+
+
