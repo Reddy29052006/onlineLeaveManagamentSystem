@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -74,8 +74,10 @@ function WarningList({ warnings }) {
 
 export default function LeaveApplyPage() {
   const { user } = useAuth();
-  const isStudent = user?.role === 'student';
-  const base = `/${user?.role || 'student'}`;
+  const location = useLocation();
+  const isTeacherRoute = location.pathname.startsWith('/teacher');
+  const isStudent = !isTeacherRoute && user?.role !== 'teacher';
+  const base = isTeacherRoute ? '/teacher' : '/student';
 
   const [step, setStep] = useState('form');
   const [leaveType, setLeaveType] = useState('Casual Leave');

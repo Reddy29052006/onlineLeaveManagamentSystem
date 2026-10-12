@@ -13,7 +13,7 @@ import {
   Sparkles,
   XCircle,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../features/auth/AuthContext.jsx';
 import { ROLE_LABELS } from '../routes/roleHome.js';
 import { dashboardApi } from '../services/dashboardApi.js';
@@ -36,10 +36,14 @@ function formatDate(value) {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const location = useLocation();
+  const isTeacherRoute = location.pathname.startsWith('/teacher');
+  const isTeacher = isTeacherRoute || user?.role === 'teacher';
+
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [balanceTab, setBalanceTab] = useState(user?.role === 'teacher' ? 'employee' : 'student');
+  const [balanceTab, setBalanceTab] = useState(isTeacher ? 'employee' : 'student');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -93,11 +97,8 @@ export default function DashboardPage() {
     );
   }
 
-  const base = `/${user.role}`;
-  const { today, stats, recentApplications = [] } = data || {
-    stats: { total: 0, pending: 0, approved: 0, rejected: 0, pendingDays: 0, approvedDays: 0 },
-    recentApplications: [],
-  };
+  const base = isTeacherRoute ? '/teacher' : (user?.role === 'teacher' ? '/teacher' : '/student');
+  const { today, stats = { total: 0, pending: 0, approved: 0, rejected: 0, pendingDays: 0, approvedDays: 0 }, recentApplications = [] } = data || {};
 
   // Dynamic leave balances
   const casualUsed = Math.min(stats.approved, 10);

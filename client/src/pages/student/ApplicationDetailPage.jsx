@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -51,8 +51,9 @@ function formatDate(value) {
 
 export default function ApplicationDetailPage() {
   const { id } = useParams();
-  const { user } = useAuth();
-  const base = `/${user?.role || 'student'}`;
+  const location = useLocation();
+  const isTeacherRoute = location.pathname.startsWith('/teacher');
+  const base = isTeacherRoute ? '/teacher' : (user?.role === 'teacher' ? '/teacher' : '/student');
 
   const [application, setApplication] = useState(null);
   const [letter, setLetter] = useState(null);

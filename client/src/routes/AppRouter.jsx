@@ -74,7 +74,7 @@ export default function AppRouter() {
       <Route
         path="/student"
         element={
-          <ProtectedRoute allowedRoles={['student']}>
+          <ProtectedRoute allowedRoles={['student', 'admin']}>
             <ApplicantLayout />
           </ProtectedRoute>
         }
@@ -89,7 +89,7 @@ export default function AppRouter() {
       <Route
         path="/teacher"
         element={
-          <ProtectedRoute allowedRoles={['teacher']}>
+          <ProtectedRoute allowedRoles={['teacher', 'admin']}>
             <ApplicantLayout />
           </ProtectedRoute>
         }

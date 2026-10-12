@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowRight,
@@ -43,9 +43,9 @@ export default function LeaveHistoryPage() {
   const [sortOrder, setSortOrder] = useState('desc');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [downloadingId, setDownloadingId] = useState(null);
-
-  const base = user ? `/${user.role}` : '/student';
+  const location = useLocation();
+  const isTeacherRoute = location.pathname.startsWith('/teacher');
+  const base = isTeacherRoute ? '/teacher' : (user?.role === 'teacher' ? '/teacher' : '/student');
 
   const load = useCallback(async (page = 1) => {
     setLoading(true);

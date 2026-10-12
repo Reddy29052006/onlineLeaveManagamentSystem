@@ -20,6 +20,10 @@ export default function ProtectedRoute({ allowedRoles, children }) {
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
+    // System Administrators can view student and teacher sections for administrative inspection
+    if (user.role === 'admin' && (allowedRoles.includes('student') || allowedRoles.includes('teacher'))) {
+      return children;
+    }
     return <Navigate to={homePathForRole(user.role)} replace />;
   }
 

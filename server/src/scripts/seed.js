@@ -30,7 +30,7 @@ async function upsertUser({ name, email, username, password, role, ...profile })
     passwordHash,
     role,
     accountStatus: 'active',
-    mustChangePassword: true,
+    mustChangePassword: false,
     ...profile,
   });
   console.log(`  created  ${role.padEnd(7)} ${normalizedEmail}`);

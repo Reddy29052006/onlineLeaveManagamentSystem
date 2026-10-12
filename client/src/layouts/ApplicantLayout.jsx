@@ -26,7 +26,8 @@ export default function ApplicantLayout() {
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
-  const base = `/${user?.role || ''}`;
+  const isTeacherRoute = location.pathname.startsWith('/teacher');
+  const base = isTeacherRoute ? '/teacher' : (user?.role === 'teacher' ? '/teacher' : '/student');
 
   const navItems = [
     { to: base, label: 'Dashboard', icon: LayoutDashboard, end: true },
