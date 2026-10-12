@@ -9,6 +9,8 @@ import { env } from './config/env.js';
 import apiRoutes from './routes/index.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 import { issueCsrfToken, verifyCsrf } from './middleware/csrf.js';
+import { sanitizeInput } from './middleware/sanitizeInput.js';
+import { apiLimiter } from './middleware/rateLimiters.js';
 
 const app = express();
 
@@ -35,9 +37,13 @@ app.use(
     credentials: true,
   })
 );
+
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 app.use(cookieParser());
+
+// NoSQL operator injection & prototype pollution prevention
+app.use(sanitizeInput);
 
 const sessionStore = MongoStore.create({
   mongoUrl: env.mongodbUri,
@@ -70,7 +76,8 @@ if (env.nodeEnv === 'development') {
   app.use(morgan('dev'));
 }
 
-app.use('/api/v1', apiRoutes);
+// Global API rate limiting
+app.use('/api/v1', apiLimiter, apiRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

@@ -57,8 +57,8 @@ Because there is no existing code, every required feature is **MISSING**:
 | Academic Calendar + Holiday Management (Stage 8) | COMPLETED |
 | Leave History + Print + PDF Downloads (Stage 9) | COMPLETED |
 | UI/UX, Accessibility & Responsiveness (Stage 10) | COMPLETED |
-| Security/reliability hardening (Stage 11) | NEXT |
-| Automated + E2E tests (Stage 12) | PENDING |
+| Security/reliability hardening (Stage 11) | COMPLETED |
+| Automated + E2E tests (Stage 12) | NEXT |
 | Deployment docs + README (Stage 13) | PENDING |
 
 ### 4. Confirmed Technology Stack
@@ -1225,5 +1225,79 @@ COMPLETED AND VERIFIED.
 ### 7. Next stage
 
 **Stage 11 — Security, Validation, Reliability, and Error Handling.**
+
+---
+
+## Stage 11 — Security, Validation, Reliability, and Error Handling
+
+**Status:** COMPLETED AND VERIFIED
+**Date:** 2026-10-12
+
+### 1. Goal
+
+Harden the application against common security vulnerabilities, malformed input, NoSQL operator injections, and unauthorized access, ensuring reliability across all endpoints.
+
+### 2. Delivered Features
+
+- **NoSQL Operator Injection & Prototype Pollution Defense (`sanitizeInput.js`):**
+  - Recursively inspects `req.body`, `req.query`, and `req.params`.
+  - Rejects any key starting with `$` or containing `.` with HTTP `400 INVALID_INPUT`.
+  - Blocks query tampering such as `?status[$ne]=Approved` and body manipulation like `{"identifier": {"$gt": ""}}`.
+
+- **Enhanced Central Error Handler (`errorHandler.js`):**
+  - Normalized Mongoose `CastError` into HTTP `400 INVALID_IDENTIFIER` (prevents unhandled 500 crashes on malformed IDs).
+  - Normalized Mongoose `ValidationError` into HTTP `400 VALIDATION_ERROR` with structured field errors.
+  - Normalized Mongo duplicate key error `E11000` into HTTP `409 DUPLICATE`.
+  - Suppressed internal stack traces on 500 errors in non-development environments.
+
+- **Global API Rate Limiting (`rateLimiters.js`):**
+  - Mounted `apiLimiter` (1,000 requests per 15 minutes per IP) across all `/api/v1` routes to prevent denial of service and automated scraping.
+  - Kept strict `loginLimiter` (10 requests per 15 minutes) on `/auth/login`.
+
+- **Full Security Checklist Compliance:**
+  - Password hashes computed with bcrypt and excluded from serialization (`select: false`).
+  - HttpOnly sessions stored in MongoDB Atlas with secure cookies and double-submit CSRF tokens in `X-CSRF-Token` headers.
+  - Granular RBAC and ownership guards across leave records, notifications, and administrator consoles.
+  - 0 known security vulnerabilities reported by `npm audit` across both client and server trees.
+
+### 3. Files created (Stage 11)
+
+Server:
+- `server/src/middleware/sanitizeInput.js`
+
+Tests:
+- `scratch/test_stage11.js`
+
+### 4. Files modified (Stage 11)
+
+Server:
+- `server/src/middleware/errorHandler.js` — Added CastError, ValidationError, and duplicate key normalization.
+- `server/src/middleware/rateLimiters.js` — Added `apiLimiter`.
+- `server/src/app.js` — Mounted `sanitizeInput` and `apiLimiter`.
+- `PROJECT_PROGRESS.md` — Updated stage status and documentation.
+
+### 5. Testing and verification
+
+- **PASS** — Backend syntax: `node --check` passed on all server files.
+- **PASS** — Dependency audits: 0 vulnerabilities on both server and client (`npm audit`).
+- **PASS** — Automated Security & Reliability Test Suite (`scratch/test_stage11.js`):
+  - NoSQL injection in body rejected with 400 `INVALID_INPUT`.
+  - NoSQL injection in query string rejected with 400 `INVALID_INPUT`.
+  - Malformed ObjectId in unauthenticated requests handled cleanly (401).
+  - Malformed ObjectId in authenticated requests handled cleanly (404/400, no 500 crash).
+  - Missing CSRF header blocked with 403 `CSRF_INVALID`.
+  - Forged CSRF header blocked with 403 `CSRF_INVALID`.
+  - Student blocked from administrative user endpoints with 403 `FORBIDDEN`.
+  - Password hashes verified completely hidden and omitted from responses.
+  - Standardized 404 error format verified without internal path disclosure.
+
+### 6. Stage completion status
+
+COMPLETED AND VERIFIED.
+
+### 7. Next stage
+
+**Stage 12 — Automated and End-to-End Testing.**
+
 
 

@@ -25,3 +25,12 @@ export const loginLimiter = isTest
       max: 10,
       message: 'Too many login attempts. Please wait a few minutes and try again.',
     });
+
+export const apiLimiter = isTest
+  ? (req, res, next) => next()
+  : createRateLimiter({
+      windowMs: 15 * 60 * 1000,
+      max: 1000,
+      message: 'Too many requests from this client. Please slow down and try again later.',
+    });
+
